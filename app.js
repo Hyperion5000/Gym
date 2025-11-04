@@ -73,12 +73,21 @@ async function loadPlan() {
 async function loadPlanFromCSV() {
   try {
     const response = await fetch('./plan.csv');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch plan.csv: ${response.status} ${response.statusText}`);
+    }
     const csvText = await response.text();
+    if (!csvText || csvText.trim().length === 0) {
+      throw new Error('plan.csv is empty');
+    }
     await dbModule.loadCSVIntoTable('plan', csvText);
     await loadPlan();
   } catch (error) {
     console.error('Failed to load plan from CSV:', error);
-    alert('Не удалось загрузить план тренировок');
+    const errorMsg = `Не удалось загрузить план тренировок: ${error.message}`;
+    console.error(errorMsg);
+    // Не показываем alert, чтобы не блокировать интерфейс
+    // Просто логируем ошибку
   }
 }
 

@@ -11,24 +11,29 @@ async function initSQL() {
   if (SQL) return SQL;
   
   try {
-    // Ждем загрузки SQL.js из скрипта в HTML
-    if (typeof initSqlJs === 'undefined') {
+    // initSqlJs должен быть доступен через window (устанавливается в index.html)
+    const initFn = window.initSqlJs;
+    
+    if (typeof initFn === 'undefined') {
+      // Если все еще не загружен, ждем
       await new Promise((resolve, reject) => {
         let attempts = 0;
+        const maxAttempts = 200; // 10 секунд максимум
         const check = setInterval(() => {
           attempts++;
-          if (typeof initSqlJs !== 'undefined') {
+          const fn = window.initSqlJs;
+          if (typeof fn !== 'undefined') {
             clearInterval(check);
             resolve();
-          } else if (attempts > 50) {
+          } else if (attempts >= maxAttempts) {
             clearInterval(check);
-            reject(new Error('SQL.js failed to load'));
+            reject(new Error('SQL.js не загрузился. Проверьте интернет соединение.'));
           }
-        }, 100);
+        }, 50);
       });
     }
     
-    SQL = await initSqlJs({
+    SQL = await window.initSqlJs({
       locateFile: file => `https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/${file}`
     });
     return SQL;
@@ -106,7 +111,14 @@ async function createSchema() {
   
   try {
     const response = await fetch('./schema.sql');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch schema.sql: ${response.status} ${response.statusText}`);
+    }
     const schema = await response.text();
+    
+    if (!schema || schema.trim().length === 0) {
+      throw new Error('schema.sql is empty');
+    }
     
     // Выполняем SQL команды (разделяем по ;)
     const statements = schema
@@ -114,13 +126,17 @@ async function createSchema() {
       .map(s => s.trim())
       .filter(s => s && !s.startsWith('--') && s.length > 0);
     
+    if (statements.length === 0) {
+      throw new Error('No valid SQL statements found in schema.sql');
+    }
+    
     for (const statement of statements) {
       if (statement) {
         try {
           db.run(statement);
         } catch (e) {
           // Игнорируем ошибки "already exists" для CREATE TABLE IF NOT EXISTS
-          if (!e.message.includes('already exists')) {
+          if (!e.message.includes('already exists') && !e.message.includes('duplicate column name')) {
             console.warn('SQL statement failed:', statement, e);
           }
         }
@@ -130,7 +146,7 @@ async function createSchema() {
     await saveDatabase();
   } catch (error) {
     console.error('Failed to create schema:', error);
-    throw error;
+    throw new Error(`Не удалось загрузить схему БД: ${error.message}`);
   }
 }
 
