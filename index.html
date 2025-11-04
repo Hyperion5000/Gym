@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>MESO • Тренировки</title>
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="title">MESO</div>
+    <nav class="tabs">
+      <button data-tab="train" class="tab active">🏋️ Тренировка</button>
+      <button data-tab="dash" class="tab">📊 Дашборд</button>
+      <button data-tab="prs" class="tab">🏆 Рекорды</button>
+    </nav>
+    <div class="actions">
+      <button id="btn-export" class="btn">📥 Экспорт</button>
+      <button id="btn-import" class="btn">📤 Импорт</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="train" class="tabpage active">
+      <div class="controls card">
+        <div class="row gap">
+          <div>
+            <label>Неделя</label>
+            <select id="week">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+          <div>
+            <label>День</label>
+            <select id="day"></select>
+          </div>
+          <div>
+            <label>Дата</label>
+            <input type="date" id="date">
+          </div>
+          <div class="grow"></div>
+        </div>
+        <div id="session-bar" class="row gap small muted">
+          <span id="session-status">Сессия: нет</span>
+          <button id="btn-finish" class="btn">✅ Завершить</button>
+        </div>
+      </div>
+
+      <div id="hints" class="card">
+        <div class="hints-header">
+          <span class="hint-icon">💡</span>
+          <b>Подсказки прошлого:</b>
+        </div>
+        <div id="hints-list" class="hints"></div>
+      </div>
+
+      <div id="exercises-list" class="exercises-list"></div>
+
+      <div class="save-section">
+        <button id="btn-save" class="btn primary">💾 Сохранить в БД</button>
+      </div>
+
+      <div class="card small">
+        <b>Подсказки:</b> вводишь только <i>вес</i> и <i>повторы</i>. Остальное считается автоматически.
+        Длинный тап по кнопкам веса — применит ко всем сетам упражнения.
+      </div>
+    </section>
+
+    <section id="dash" class="tabpage">
+      <div class="card">
+        <h3>Дашборд</h3>
+        <div id="metrics" class="metrics">
+          <div class="metric">
+            <div class="label">Тоннаж (неделя)</div>
+            <div id="m-tonnage" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Повторы (неделя)</div>
+            <div id="m-reps" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Сеты (неделя)</div>
+            <div id="m-sets" class="value">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Попадание в RIR</div>
+            <div id="m-rir" class="value">—</div>
+          </div>
+        </div>
+        <div class="row gap">
+          <div class="card sub">
+            <div class="sub-title">Лучшие e1RM</div>
+            <ul id="best-e1rm"></ul>
+          </div>
+          <div class="card sub">
+            <div class="sub-title">По типам A/B/C/D</div>
+            <ul id="by-type"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="prs" class="tabpage">
+      <div class="card">
+        <h3>PR (личные рекорды)</h3>
+        <ul id="pr-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="safe"></footer>
+
+  <input type="file" id="file-import" accept=".json" style="display: none;">
+
+  <div id="loading" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: flex; align-items: center; justify-content: center; z-index: 10000; font-size: 18px;">
+    <div style="text-align: center;">
+      <div style="margin-bottom: 16px;">⏳ Загрузка...</div>
+      <div style="font-size: 14px; opacity: 0.8;">Инициализация базы данных</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js');
+      });
+    }
+    document.addEventListener('click', (e) => {
+      const t = e.target.closest('.tab');
+      if (!t) return;
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.tabpage').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById(t.dataset.tab).classList.add('active');
+    });
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
+
