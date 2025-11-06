@@ -174,13 +174,25 @@ async function initDatabase() {
   
   if (savedData) {
     db = new SQL.Database(savedData);
-    // Запускаем миграции для существующей БД
-    await runMigrations();
+    // Проверяем, что схема существует, если нет - создаем
+    const schemaVersionCheck = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'`);
+    if (!schemaVersionCheck || schemaVersionCheck.length === 0) {
+      console.log('Schema not found in existing DB, creating...');
+      await createSchema();
+      await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Схема создана для существующей БД');
+    } else {
+      // Запускаем миграции для существующей БД
+      await runMigrations();
+    }
   } else {
     db = new SQL.Database();
     await createSchema();
     // Устанавливаем текущую версию для новой БД
-    await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Новая БД');
+    try {
+      await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Новая БД');
+    } catch (e) {
+      console.warn('Failed to set schema version (may already exist):', e.message);
+    }
   }
   
   updateProgress(90, 'База данных готова');
