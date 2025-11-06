@@ -721,54 +721,53 @@ ul li:last-child {
   .set-row .set-input {
     min-height: 48px;
     font-size: 16px;
-    width: 100%;
   }
   
-  /* Группируем поля ввода в одну строку */
-  .set-row .set-input:nth-of-type(1) {
-    display: inline-block;
+  .set-row .set-input.w {
     width: calc(50% - 4px);
     margin-right: 8px;
   }
   
-  .set-row .set-input:nth-of-type(2) {
-    display: inline-block;
+  .set-row .set-input.r {
     width: calc(50% - 4px);
   }
   
-  /* Контейнер для значений RIR/RPE/e1RM */
+  /* Контейнер для всех значений RIR/RPE/e1RM в одну строку */
   .set-row .set-value {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    font-size: 12px;
-    padding: 6px 10px;
+    gap: 2px;
+    font-size: 11px;
+    padding: 6px 8px;
     background: var(--bg-secondary);
     border-radius: var(--radius-sm);
-    margin-right: 8px;
-    min-width: 80px;
+    margin-right: 4px;
+    margin-top: 8px;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  
+  .set-row .set-value::before {
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 2px;
   }
   
   .set-row .set-value.rir::before {
-    content: "RIR: ";
-    font-weight: 600;
-    color: var(--text-muted);
+    content: "RIR:";
   }
   
   .set-row .set-value.rpe::before {
-    content: "RPE: ";
-    font-weight: 600;
-    color: var(--text-muted);
+    content: "RPE:";
   }
   
   .set-row .set-value.e1rm::before {
-    content: "e1RM: ";
-    font-weight: 600;
-    color: var(--text-muted);
+    content: "e1RM:";
   }
   
-  .set-row .set-value:last-child {
+  .set-row .set-value:last-of-type {
     margin-right: 0;
   }
   
