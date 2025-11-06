@@ -236,12 +236,6 @@ async function buildExercises() {
           </div>
         `).join('')}
       </div>
-      <div class="quick-actions">
-        <button class="btn mini" data-step="-5">-5</button>
-        <button class="btn mini" data-step="-2.5">-2.5</button>
-        <button class="btn mini" data-step="+2.5">+2.5</button>
-        <button class="btn mini" data-step="+5">+5</button>
-      </div>
     `;
     
     container.appendChild(card);
@@ -439,45 +433,6 @@ function initGlobalHandlers() {
       }
     }
   }, true); // capture phase для blur
-  
-  // Единый обработчик для кнопок быстрых действий
-  container.addEventListener('click', (e) => {
-    const btn = e.target.closest('.quick-actions .btn');
-    if (!btn) return;
-    
-    const card = btn.closest('.exercise-card');
-    if (!card) return;
-    
-    const step = Number(btn.dataset.step);
-    const wInputs = card.querySelectorAll('input.w');
-    const target = Array.from(wInputs).find(x => x === document.activeElement) ||
-                   Array.from(wInputs).find(x => x.value) || wInputs[0];
-    
-    let val = Number(normalizeNumber(target.value || '0'));
-    val = Math.max(0, Math.round((val + step) * 10) / 10);
-    target.value = String(val);
-    computeCard(card);
-  });
-  
-  // Единый обработчик для contextmenu (длинный тап)
-  container.addEventListener('contextmenu', (e) => {
-    const btn = e.target.closest('.quick-actions .btn');
-    if (!btn) return;
-    
-    e.preventDefault();
-    const card = btn.closest('.exercise-card');
-    if (!card) return;
-    
-    const step = Number(btn.dataset.step);
-    const wInputs = card.querySelectorAll('input.w');
-    
-    wInputs.forEach(inp => {
-      let val = Number(normalizeNumber(inp.value || '0'));
-      val = Math.max(0, Math.round((val + step) * 10) / 10);
-      inp.value = String(val);
-    });
-    computeCard(card);
-  });
 }
 
 // Вычисление значений для карточки

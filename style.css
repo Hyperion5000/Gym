@@ -458,19 +458,6 @@ input::placeholder {
   border-radius: var(--radius-sm);
 }
 
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-light);
-}
-
-.quick-actions .btn {
-  min-width: 50px;
-  padding: 8px 12px;
-}
-
 /* ===== ПОДСКАЗКИ ===== */
 .hints-header {
   display: flex;
@@ -703,10 +690,6 @@ ul li:last-child {
   .exercise-info {
     flex-direction: column;
     gap: 8px;
-  }
-  
-  .quick-actions {
-    flex-wrap: wrap;
   }
 }
 
