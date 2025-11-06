@@ -234,14 +234,14 @@ async function buildExercises() {
           <div class="set-header-label">Повт</div>
           <div class="set-header-label" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)">e1RM</div>
         </div>
-        ${[1, 2, 3, 4].map((setNum) => `
-          <div class="set-row" data-set="${setNum}">
-            <div class="set-label">Сет ${setNum}</div>
-            <input class="set-input w" type="text" inputmode="decimal" placeholder="Вес" data-set="${setNum}">
-            <input class="set-input r" type="text" inputmode="numeric" placeholder="Повт" data-set="${setNum}">
-            <div class="set-value e1rm" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)"></div>
-          </div>
-        `).join('')}
+              ${[1, 2, 3, 4].map((setNum) => `
+                <div class="set-row" data-set="${setNum}">
+                  <div class="set-label">Сет ${setNum}</div>
+                  <input class="set-input w" type="text" inputmode="decimal" placeholder="Вес" data-set="${setNum}">
+                  <input class="set-input r" type="text" inputmode="numeric" placeholder="Повт" data-set="${setNum}">
+                  <div class="set-value e1rm hidden" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)"></div>
+                </div>
+              `).join('')}
       </div>
     `;
     
