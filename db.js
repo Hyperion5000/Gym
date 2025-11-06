@@ -424,15 +424,24 @@ async function importDatabase(jsonData) {
 async function loadCSVIntoTable(tableName, csvText) {
   if (!db) await initDatabase();
   
-  // Проверяем, что таблица существует
+  // Проверяем, что таблица существует, если нет - создаем схему
   try {
     const tableCheck = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
     if (!tableCheck || tableCheck.length === 0) {
-      throw new Error(`Table ${tableName} does not exist. Please create schema first.`);
+      console.warn(`Table ${tableName} does not exist, creating schema...`);
+      // Создаем схему, если таблицы нет
+      await createSchema();
+      // Проверяем снова
+      const tableCheck2 = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
+      if (!tableCheck2 || tableCheck2.length === 0) {
+        throw new Error(`Table ${tableName} could not be created. Please check schema.sql.`);
+      }
+      console.log(`Table ${tableName} created successfully`);
+    } else {
+      console.log(`Table ${tableName} exists, proceeding with CSV import...`);
     }
-    console.log(`Table ${tableName} exists, proceeding with CSV import...`);
   } catch (e) {
-    console.error(`Table ${tableName} check failed:`, e);
+    console.error(`Table ${tableName} check/creation failed:`, e);
     throw e;
   }
   

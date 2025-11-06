@@ -126,8 +126,21 @@ async function loadPlan() {
 }
 
 // Загрузка плана из CSV
+let isLoadingPlanFromCSV = false; // Флаг для предотвращения бесконечного цикла
+
 async function loadPlanFromCSV() {
+  // Предотвращаем бесконечный цикл
+  if (isLoadingPlanFromCSV) {
+    console.warn('loadPlanFromCSV already in progress, skipping...');
+    return;
+  }
+  
+  isLoadingPlanFromCSV = true;
+  
   try {
+    // Убеждаемся, что схема БД создана
+    await dbModule.initDatabase();
+    
     const response = await fetch('./plan.csv');
     if (!response.ok) {
       throw new Error(`Failed to fetch plan.csv: ${response.status} ${response.statusText}`);
@@ -140,14 +153,32 @@ async function loadPlanFromCSV() {
     console.log('Loading plan from CSV...');
     await dbModule.loadCSVIntoTable('plan', csvText);
     
-    // Перезагружаем план из БД
-    await loadPlan();
-    console.log('Plan loaded successfully');
+    // Перезагружаем план из БД (но без вызова loadPlanFromCSV снова)
+    PLAN = {};
+    const data = await dbModule.query('SELECT * FROM plan ORDER BY day');
+    
+    if (data && data.length > 0) {
+      for (const row of data) {
+        const d = row.day;
+        if (d) {
+          (PLAN[d] = PLAN[d] || []).push({
+            name: row.exercise,
+            setrep: row.setrep,
+            type: row.type,
+            target: { 1: row.rir_w1, 2: row.rir_w2, 3: row.rir_w3, 4: row.rir_w4 },
+            note: row.note || ''
+          });
+        }
+      }
+      console.log(`Plan loaded successfully: ${data.length} exercises in ${Object.keys(PLAN).length} days`);
+    }
   } catch (error) {
     console.error('Failed to load plan from CSV:', error);
     const errorMsg = `Не удалось загрузить план тренировок: ${error.message}`;
     console.error(errorMsg);
     showNotification(errorMsg, 'error');
+  } finally {
+    isLoadingPlanFromCSV = false;
   }
 }
 
