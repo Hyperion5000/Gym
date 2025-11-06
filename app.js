@@ -43,6 +43,53 @@ function normalizeNumber(v) {
   return v;
 }
 
+// Валидация веса
+function validateWeight(weight) {
+  const w = Number(weight);
+  if (isNaN(w)) return { valid: false, message: 'Введите корректное число' };
+  if (w < 0) return { valid: false, message: 'Вес не может быть отрицательным' };
+  if (w > 500) return { valid: false, message: 'Вес выглядит подозрительно большим (>500кг)' };
+  if (w > 0 && w < 0.5) return { valid: false, message: 'Вес слишком мал (<0.5кг)' };
+  return { valid: true };
+}
+
+// Валидация повторов
+function validateReps(reps) {
+  const r = Number(reps);
+  if (isNaN(r)) return { valid: false, message: 'Введите корректное число' };
+  if (r < 0) return { valid: false, message: 'Повторы не могут быть отрицательными' };
+  if (!Number.isInteger(r)) return { valid: false, message: 'Повторы должны быть целым числом' };
+  if (r > 100) return { valid: false, message: 'Слишком много повторов (>100)' };
+  if (r === 0) return { valid: false, message: 'Повторы должны быть больше 0' };
+  return { valid: true };
+}
+
+// Валидация ТМ
+function validateTM(tm) {
+  const t = Number(tm);
+  if (isNaN(t)) return { valid: false, message: 'Введите корректное число' };
+  if (t <= 0) return { valid: false, message: 'ТМ должен быть больше 0' };
+  if (t > 500) return { valid: false, message: 'ТМ выглядит подозрительно большим (>500кг)' };
+  return { valid: true };
+}
+
+// Показать уведомление
+function showNotification(message, type = 'info') {
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 10);
+  
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
 // Загрузка плана тренировок
 async function loadPlan() {
   PLAN = {};
@@ -92,7 +139,7 @@ async function loadPlanFromCSV() {
 }
 
 // Построение опций дней
-function buildDayOptions() {
+async function buildDayOptions() {
   const sel = $("#day");
   sel.innerHTML = "";
   Object.keys(PLAN).forEach(d => {
@@ -101,11 +148,11 @@ function buildDayOptions() {
     o.textContent = d;
     sel.appendChild(o);
   });
-  buildExercises();
+  await buildExercises();
 }
 
 // Построение карточек упражнений
-function buildExercises() {
+async function buildExercises() {
   const container = $("#exercises-list");
   const day = $("#day").value;
   const week = $("#week").value;
@@ -113,10 +160,13 @@ function buildExercises() {
   
   container.innerHTML = "";
   
-  rows.forEach((ex, idx) => {
+  for (const [idx, ex] of rows.entries()) {
     const card = document.createElement("div");
     card.className = `exercise-card type${ex.type}`;
     card.dataset.exercise = ex.name;
+    
+    // Загружаем последний ТМ
+    const lastTM = await loadLastTM(ex.name);
     
     card.dataset.target = ex.target[week] || '';
     card.innerHTML = `
@@ -128,7 +178,7 @@ function buildExercises() {
       <div class="exercise-info">
         <span>Сеты: ${ex.setrep}</span>
         <span>Цел. RIR: ${ex.target[week] || ''}</span>
-        <span>ТМ: <input class="tm-input" type="text" inputmode="decimal" placeholder="0" style="width: 80px; padding: 4px 8px; font-size: 14px;"></span>
+        <span>ТМ: <input class="tm-input" type="text" inputmode="decimal" placeholder="0" value="${lastTM || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;"></span>
       </div>
       <div class="sets-list">
         ${[1, 2, 3, 4].map((setNum) => `
@@ -151,57 +201,238 @@ function buildExercises() {
     `;
     
     container.appendChild(card);
-    attachCardHandlers(card, ex, week);
-  });
+  }
   
-  loadHints();
-  ensureSession();
+  await loadHints();
+  await displayProgression();
+  await ensureSession();
 }
 
-// Привязка обработчиков к карточке
-function attachCardHandlers(card, ex, week) {
-  const tmInput = card.querySelector('.tm-input');
-  const wInputs = card.querySelectorAll('input.w');
-  const rInputs = card.querySelectorAll('input.r');
+// Прогноз прогресса для следующей недели
+async function generateProgression() {
+  const currentWeek = Number($("#week").value);
+  const day = $("#day").value;
+  const rows = PLAN[day] || [];
   
-  // Обработка ввода веса и повторов
-  [...wInputs, ...rInputs, tmInput].forEach(inp => {
-    inp.addEventListener('input', () => {
-      if (inp.classList.contains('w') || inp.classList.contains('tm-input')) {
-        inp.value = normalizeNumber(inp.value);
+  const progressionData = [];
+  
+  for (const ex of rows) {
+    try {
+      // Получаем последние 3 тренировки этого упражнения
+      const history = await dbModule.query(
+        'SELECT weight, reps, e1rm, rir, date FROM tracker WHERE exercise = ? ORDER BY date DESC LIMIT 3',
+        [ex.name]
+      );
+      
+      if (history.length < 2) continue; // Нужно минимум 2 тренировки для прогноза
+      
+      // Вычисляем средний прирост e1RM
+      const e1rmValues = history.map(h => h.e1rm).filter(v => v);
+      if (e1rmValues.length < 2) continue;
+      
+      const avgE1RM = e1rmValues.reduce((a, b) => a + b, 0) / e1rmValues.length;
+      const trend = (e1rmValues[0] - e1rmValues[e1rmValues.length - 1]) / e1rmValues.length;
+      
+      // Прогноз на следующую неделю
+      const nextWeek = currentWeek < 4 ? currentWeek + 1 : 1;
+      const targetRIR = targetToNumber(ex.target[nextWeek]);
+      const targetReps = 8; // средние повторы
+      
+      // Рекомендуемый вес
+      let suggestedWeight = avgE1RM / (1 + targetReps / 30);
+      
+      // Учитываем тренд
+      if (trend > 0) {
+        suggestedWeight += trend * 0.5; // консервативная прогрессия
       }
-      computeCard(card);
-      if (inp.classList.contains('r')) {
-        const all = [...wInputs, ...rInputs];
-        const i = all.indexOf(inp);
-        const next = all[i + 1];
-        if (next) next.focus();
-      }
-    });
+      
+      suggestedWeight = Math.round(suggestedWeight / 2.5) * 2.5; // округляем до 2.5кг
+      
+      progressionData.push({
+        exercise: ex.name,
+        currentE1RM: Math.round(avgE1RM * 10) / 10,
+        trend: Math.round(trend * 10) / 10,
+        suggestedWeight,
+        targetReps,
+        nextWeek
+      });
+    } catch (error) {
+      console.error(`Failed to generate progression for ${ex.name}:`, error);
+    }
+  }
+  
+  return progressionData;
+}
+
+async function displayProgression() {
+  // Удаляем предыдущую карточку прогноза если есть
+  const oldCard = document.querySelector('.progression-card');
+  if (oldCard) oldCard.remove();
+  
+  const data = await generateProgression();
+  
+  if (data.length === 0) return; // Не показываем если нет данных
+  
+  const container = document.createElement('div');
+  container.className = 'card progression-card';
+  container.innerHTML = '<h4>🔮 Прогноз на следующую неделю</h4><div class="progression-list"></div>';
+  
+  const list = container.querySelector('.progression-list');
+  
+  list.innerHTML = data.map(item => `
+    <div class="progression-item">
+      <div class="progression-name">${item.exercise}</div>
+      <div class="progression-stats">
+        <span>Текущий e1RM: <strong>${item.currentE1RM}</strong> кг</span>
+        <span class="${item.trend > 0 ? 'trend-up' : item.trend < 0 ? 'trend-down' : 'trend-neutral'}">
+          Тренд: ${item.trend > 0 ? '📈' : item.trend < 0 ? '📉' : '➡️'} ${item.trend > 0 ? '+' : ''}${item.trend} кг
+        </span>
+      </div>
+      <div class="progression-recommendation">
+        💡 Рекомендация для недели ${item.nextWeek}: <strong>${item.suggestedWeight}</strong> кг × ${item.targetReps} повт
+      </div>
+    </div>
+  `).join('');
+  
+  // Добавляем после подсказок
+  const hintsCard = $("#hints");
+  if (hintsCard && hintsCard.parentNode) {
+    hintsCard.parentNode.insertBefore(container, hintsCard.nextSibling);
+  }
+}
+
+// Загрузка последнего ТМ для упражнения
+async function loadLastTM(exercise) {
+  try {
+    const row = await dbModule.getOne(
+      'SELECT tm_kg FROM tm WHERE exercise = ?',
+      [exercise]
+    );
+    return row?.tm_kg || null;
+  } catch (error) {
+    console.warn('Failed to load TM:', error);
+    return null;
+  }
+}
+
+// Сохранение ТМ для упражнения
+async function saveTM(exercise, tm) {
+  if (!tm || tm <= 0) return;
+  try {
+    await dbModule.execute(
+      'INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
+      [exercise, tm]
+    );
+  } catch (error) {
+    console.warn('Failed to save TM:', error);
+  }
+}
+
+// Инициализация глобального обработчика событий (Event Delegation)
+function initGlobalHandlers() {
+  const container = $("#exercises-list");
+  
+  // Единый обработчик для всех input событий
+  container.addEventListener('input', (e) => {
+    const inp = e.target;
+    if (!inp.matches('input')) return;
+    
+    const card = inp.closest('.exercise-card');
+    if (!card) return;
+    
+    if (inp.classList.contains('tm-input') || inp.classList.contains('w')) {
+      inp.value = normalizeNumber(inp.value);
+    }
+    
+    inp.classList.remove('input-error');
+    computeCard(card);
+    
+    // Автофокус на следующее поле после ввода повторов
+    if (inp.classList.contains('r') && inp.value) {
+      const wInputs = card.querySelectorAll('input.w');
+      const rInputs = card.querySelectorAll('input.r');
+      const all = [...wInputs, ...rInputs];
+      const i = all.indexOf(inp);
+      const next = all[i + 1];
+      if (next) next.focus();
+    }
   });
   
-  // Быстрые действия
-  card.querySelectorAll('.quick-actions .btn').forEach(b => {
-    b.addEventListener('click', (e) => {
-      const step = Number(b.dataset.step);
-      const target = Array.from(wInputs).find(x => x === document.activeElement) ||
-                     Array.from(wInputs).find(x => x.value) || wInputs[0];
-      let val = Number(normalizeNumber(target.value || '0'));
-      val = Math.max(0, Math.round((val + step) * 10) / 10);
-      target.value = String(val);
-      computeCard(card);
-    });
+  // Единый обработчик для blur (валидация)
+  container.addEventListener('blur', async (e) => {
+    const inp = e.target;
+    if (!inp.matches('input')) return;
     
-    b.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      const step = Number(b.dataset.step);
-      wInputs.forEach(inp => {
-        let val = Number(normalizeNumber(inp.value || '0'));
-        val = Math.max(0, Math.round((val + step) * 10) / 10);
-        inp.value = String(val);
-      });
-      computeCard(card);
+    const card = inp.closest('.exercise-card');
+    if (!card) return;
+    
+    const exName = card.dataset.exercise;
+    const value = Number(normalizeNumber(inp.value || 0));
+    
+    if (value > 0) {
+      let validation;
+      
+      if (inp.classList.contains('tm-input')) {
+        validation = validateTM(value);
+        if (!validation.valid) {
+          inp.classList.add('input-error');
+          showNotification(validation.message, 'warning');
+        } else {
+          await saveTM(exName, value);
+        }
+      } else if (inp.classList.contains('w')) {
+        validation = validateWeight(value);
+        if (validation && !validation.valid) {
+          inp.classList.add('input-error');
+          showNotification(`${exName}: ${validation.message}`, 'warning');
+        }
+      } else if (inp.classList.contains('r')) {
+        validation = validateReps(value);
+        if (validation && !validation.valid) {
+          inp.classList.add('input-error');
+          showNotification(`${exName}: ${validation.message}`, 'warning');
+        }
+      }
+    }
+  }, true); // capture phase для blur
+  
+  // Единый обработчик для кнопок быстрых действий
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.quick-actions .btn');
+    if (!btn) return;
+    
+    const card = btn.closest('.exercise-card');
+    if (!card) return;
+    
+    const step = Number(btn.dataset.step);
+    const wInputs = card.querySelectorAll('input.w');
+    const target = Array.from(wInputs).find(x => x === document.activeElement) ||
+                   Array.from(wInputs).find(x => x.value) || wInputs[0];
+    
+    let val = Number(normalizeNumber(target.value || '0'));
+    val = Math.max(0, Math.round((val + step) * 10) / 10);
+    target.value = String(val);
+    computeCard(card);
+  });
+  
+  // Единый обработчик для contextmenu (длинный тап)
+  container.addEventListener('contextmenu', (e) => {
+    const btn = e.target.closest('.quick-actions .btn');
+    if (!btn) return;
+    
+    e.preventDefault();
+    const card = btn.closest('.exercise-card');
+    if (!card) return;
+    
+    const step = Number(btn.dataset.step);
+    const wInputs = card.querySelectorAll('input.w');
+    
+    wInputs.forEach(inp => {
+      let val = Number(normalizeNumber(inp.value || '0'));
+      val = Math.max(0, Math.round((val + step) * 10) / 10);
+      inp.value = String(val);
     });
+    computeCard(card);
   });
 }
 
@@ -436,9 +667,30 @@ async function saveToDB() {
   const rows = collectRows();
   
   if (!rows.length) {
-    alert("Нет заполненных сетов.");
+    showNotification("Нет заполненных сетов.", 'warning');
     return;
   }
+  
+  // Валидация всех данных перед сохранением
+  let hasErrors = false;
+  for (const row of rows) {
+    const weightValidation = validateWeight(row.weight);
+    const repsValidation = validateReps(row.reps);
+    
+    if (!weightValidation.valid) {
+      showNotification(`${row.exercise}, сет ${row.set_no}: ${weightValidation.message}`, 'error');
+      hasErrors = true;
+      break;
+    }
+    
+    if (!repsValidation.valid) {
+      showNotification(`${row.exercise}, сет ${row.set_no}: ${repsValidation.message}`, 'error');
+      hasErrors = true;
+      break;
+    }
+  }
+  
+  if (hasErrors) return;
   
   try {
     for (const row of rows) {
@@ -450,10 +702,13 @@ async function saveToDB() {
       );
     }
     
-    alert("Сохранено: " + rows.length + " рядов");
+    showNotification(`Сохранено: ${rows.length} сетов`, 'success');
+    
+    // Обновляем статус сессии после сохранения
+    await ensureSession();
   } catch (error) {
     console.error('Failed to save:', error);
-    alert("Ошибка сохранения: " + error.message);
+    showNotification("Ошибка сохранения: " + error.message, 'error');
   }
 }
 
@@ -480,10 +735,25 @@ async function ensureSession() {
         'SELECT * FROM sessions WHERE date = ? AND day = ? AND status = ?',
         [date, day, 'open']
       );
+      showNotification('Тренировка начата! Заполняйте сеты.', 'info');
     }
     
-    $("#session-status").textContent = CURRENT_SESSION ?
-      `Сессия: открыта (${date})` : 'Сессия: нет';
+    // Получаем статистику текущей сессии
+    const stats = await dbModule.getOne(
+      'SELECT COUNT(*) as sets, SUM(weight * reps) as tonnage FROM tracker WHERE date = ? AND day = ?',
+      [date, day]
+    );
+    
+    const statusText = `Тренировка: ${day} • Сеты: ${stats?.sets || 0} • Тоннаж: ${Math.round(stats?.tonnage || 0)} кг`;
+    $("#session-status").textContent = statusText;
+    
+    // Показываем/скрываем кнопку завершения
+    const finishBtn = $("#btn-finish");
+    if (stats?.sets > 0) {
+      finishBtn.style.display = 'inline-flex';
+    } else {
+      finishBtn.style.display = 'none';
+    }
   } catch (error) {
     console.error('Failed to ensure session:', error);
   }
@@ -493,13 +763,24 @@ async function finishSession() {
   if (!CURRENT_SESSION) return;
   
   try {
-    await dbModule.execute(
-      'UPDATE sessions SET status = ? WHERE id = ?',
-      ['done', CURRENT_SESSION.id]
+    // Получаем финальную статистику
+    const stats = await dbModule.getOne(
+      'SELECT COUNT(*) as sets, SUM(weight * reps) as tonnage FROM tracker WHERE date = ? AND day = ?',
+      [CURRENT_SESSION.date, CURRENT_SESSION.day]
     );
-    $("#session-status").textContent = 'Сессия: завершена';
+    
+    await dbModule.execute(
+      'UPDATE sessions SET status = ?, note = ? WHERE id = ?',
+      ['done', `Завершено: ${stats?.sets || 0} сетов, ${Math.round(stats?.tonnage || 0)} кг`, CURRENT_SESSION.id]
+    );
+    
+    showNotification(`Тренировка завершена! ${stats?.sets || 0} сетов, ${Math.round(stats?.tonnage || 0)} кг тоннажа`, 'success');
+    $("#session-status").textContent = 'Тренировка завершена ✓';
+    $("#btn-finish").style.display = 'none';
+    CURRENT_SESSION = null;
   } catch (error) {
     console.error('Failed to finish session:', error);
+    showNotification('Ошибка завершения тренировки', 'error');
   }
 }
 
@@ -563,6 +844,207 @@ async function loadPRs() {
   }
 }
 
+// История тренировок
+async function loadHistory() {
+  const week = $("#history-week").value;
+  const day = $("#history-day").value;
+  
+  let sql = 'SELECT * FROM tracker WHERE 1=1';
+  const params = [];
+  
+  if (week) {
+    sql += ' AND week = ?';
+    params.push(Number(week));
+  }
+  
+  if (day) {
+    sql += ' AND day = ?';
+    params.push(day);
+  }
+  
+  sql += ' ORDER BY date DESC, exercise, set_no';
+  
+  try {
+    const data = await dbModule.query(sql, params);
+    displayHistory(data);
+  } catch (error) {
+    console.error('Failed to load history:', error);
+    showNotification('Ошибка загрузки истории', 'error');
+  }
+}
+
+function displayHistory(data) {
+  const container = $("#history-list");
+  container.innerHTML = '';
+  
+  if (!data || data.length === 0) {
+    container.innerHTML = '<p class="empty-state">Нет данных. Попробуйте изменить фильтры.</p>';
+    return;
+  }
+  
+  // Группируем по дате и упражнению
+  const grouped = {};
+  data.forEach(row => {
+    const key = `${row.date}_${row.exercise}`;
+    if (!grouped[key]) {
+      grouped[key] = {
+        date: row.date,
+        week: row.week,
+        day: row.day,
+        exercise: row.exercise,
+        sets: []
+      };
+    }
+    grouped[key].sets.push(row);
+  });
+  
+  Object.values(grouped).forEach(group => {
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    
+    card.innerHTML = `
+      <div class="history-header">
+        <div>
+          <strong>${group.exercise}</strong>
+          <div class="history-meta">${group.date} • Неделя ${group.week} • ${group.day}</div>
+        </div>
+        <button class="btn mini delete" data-date="${group.date}" data-exercise="${group.exercise}">
+          🗑️ Удалить
+        </button>
+      </div>
+      <div class="history-sets">
+        ${group.sets.map(set => `
+          <div class="history-set" data-id="${set.id}">
+            <span>Сет ${set.set_no}</span>
+            <span>${set.weight} кг × ${set.reps}</span>
+            <span>RIR: ${set.rir || '—'}</span>
+            <span>e1RM: ${set.e1rm || '—'}</span>
+            <button class="btn mini edit" data-id="${set.id}">✏️</button>
+            <button class="btn mini delete-set" data-id="${set.id}">❌</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    
+    container.appendChild(card);
+  });
+  
+  // Обработчики удаления
+  container.querySelectorAll('.delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const date = btn.dataset.date;
+      const exercise = btn.dataset.exercise;
+      
+      if (confirm(`Удалить все сеты упражнения "${exercise}" от ${date}?`)) {
+        try {
+          await dbModule.execute(
+            'DELETE FROM tracker WHERE date = ? AND exercise = ?',
+            [date, exercise]
+          );
+          showNotification('Данные удалены', 'success');
+          await loadHistory();
+          await loadDashboard();
+          await loadPRs();
+        } catch (error) {
+          console.error('Failed to delete:', error);
+          showNotification('Ошибка удаления', 'error');
+        }
+      }
+    });
+  });
+  
+  // Обработчики удаления одного сета
+  container.querySelectorAll('.delete-set').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = btn.dataset.id;
+      
+      if (confirm('Удалить этот сет?')) {
+        try {
+          await dbModule.execute('DELETE FROM tracker WHERE id = ?', [id]);
+          showNotification('Сет удален', 'success');
+          await loadHistory();
+          await loadDashboard();
+          await loadPRs();
+        } catch (error) {
+          console.error('Failed to delete set:', error);
+          showNotification('Ошибка удаления', 'error');
+        }
+      }
+    });
+  });
+  
+  // Обработчики редактирования
+  container.querySelectorAll('.edit').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const id = btn.dataset.id;
+      await editSet(id);
+    });
+  });
+}
+
+async function editSet(id) {
+  try {
+    const set = await dbModule.getOne('SELECT * FROM tracker WHERE id = ?', [id]);
+    if (!set) return;
+    
+    const newWeight = prompt(`Вес (текущий: ${set.weight} кг):`, set.weight);
+    if (newWeight === null) return;
+    
+    const newReps = prompt(`Повторы (текущий: ${set.reps}):`, set.reps);
+    if (newReps === null) return;
+    
+    const weight = Number(newWeight);
+    const reps = Number(newReps);
+    
+    // Валидация
+    const weightValidation = validateWeight(weight);
+    const repsValidation = validateReps(reps);
+    
+    if (!weightValidation.valid) {
+      showNotification(weightValidation.message, 'warning');
+      return;
+    }
+    
+    if (!repsValidation.valid) {
+      showNotification(repsValidation.message, 'warning');
+      return;
+    }
+    
+    // Пересчитываем значения
+    const e1 = e1rm(weight, reps);
+    const rir = set.target_rir ? estRIR(weight * (1 + reps / 30), weight, reps) : null;
+    const rpe = rpeFromRir(rir);
+    
+    await dbModule.execute(
+      'UPDATE tracker SET weight = ?, reps = ?, e1rm = ?, rir = ?, rpe = ? WHERE id = ?',
+      [weight, reps, e1, rir, rpe, id]
+    );
+    
+    showNotification('Сет обновлен', 'success');
+    await loadHistory();
+    await loadDashboard();
+    await loadPRs();
+  } catch (error) {
+    console.error('Failed to edit set:', error);
+    showNotification('Ошибка редактирования', 'error');
+  }
+}
+
+function initHistoryFilters() {
+  // Заполняем фильтр дней
+  const daySelect = $("#history-day");
+  daySelect.innerHTML = '<option value="">Все дни</option>';
+  Object.keys(PLAN).forEach(d => {
+    const o = document.createElement('option');
+    o.value = d;
+    o.textContent = d;
+    daySelect.appendChild(o);
+  });
+  
+  // Обработчик кнопки загрузки
+  $("#btn-load-history")?.addEventListener('click', loadHistory);
+}
+
 // Экспорт/импорт
 async function exportDatabase() {
   try {
@@ -600,6 +1082,20 @@ async function importDatabase() {
   };
 }
 
+// Обновление прогресса загрузки
+function updateProgress(percent, status) {
+  const progressBar = document.getElementById('loading-progress');
+  const statusText = document.getElementById('loading-status');
+  
+  if (progressBar) {
+    progressBar.style.width = `${percent}%`;
+  }
+  
+  if (statusText && status) {
+    statusText.textContent = status;
+  }
+}
+
 // Инициализация
 async function initApp() {
   try {
@@ -607,25 +1103,45 @@ async function initApp() {
     const loading = document.getElementById('loading');
     
     await dbModule.initDatabase();
+    
+    updateProgress(92, 'Загрузка плана тренировок...');
     $("#date").value = todayISO();
     await loadPlan();
-    buildDayOptions();
     
-    $("#week").addEventListener('change', () => {
-      buildExercises();
-      loadDashboard();
+    updateProgress(95, 'Инициализация интерфейса...');
+    
+    // Инициализируем глобальные обработчики событий (Event Delegation)
+    initGlobalHandlers();
+    
+    await buildDayOptions();
+    
+    $("#week").addEventListener('change', async () => {
+      await buildExercises();
+      await loadDashboard();
     });
     
-    $("#day").addEventListener('change', () => {
-      buildExercises();
+    $("#day").addEventListener('change', async () => {
+      await buildExercises();
     });
     
+    updateProgress(98, 'Загрузка статистики...');
     await loadDashboard();
     await loadPRs();
     
+    // Инициализируем фильтры истории
+    initHistoryFilters();
+    
+    updateProgress(100, 'Готово!');
+    
     // Скрываем индикатор загрузки после успешной инициализации
     if (loading) {
-      loading.style.display = 'none';
+      setTimeout(() => {
+        loading.style.opacity = '0';
+        loading.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => {
+          loading.style.display = 'none';
+        }, 300);
+      }, 200);
     }
   } catch (error) {
     console.error('Failed to init app:', error);
@@ -644,6 +1160,50 @@ async function initApp() {
   }
 }
 
+// Управление темой
+function initTheme() {
+  // Загружаем сохраненную тему или используем системную
+  const savedTheme = localStorage.getItem('theme');
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const theme = savedTheme || systemTheme;
+  
+  applyTheme(theme);
+  
+  // Обработчик переключения темы
+  $("#btn-theme")?.addEventListener('click', toggleTheme);
+  
+  // Слушаем изменения системной темы
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!localStorage.getItem('theme')) {
+      applyTheme(e.matches ? 'dark' : 'light');
+    }
+  });
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const btn = $("#btn-theme");
+  
+  if (theme === 'dark') {
+    root.setAttribute('data-theme', 'dark');
+    if (btn) btn.textContent = '☀️';
+  } else {
+    root.setAttribute('data-theme', 'light');
+    if (btn) btn.textContent = '🌙';
+  }
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const currentTheme = root.getAttribute('data-theme') || 'light';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  
+  applyTheme(newTheme);
+  localStorage.setItem('theme', newTheme);
+  
+  showNotification(`Тема изменена на ${newTheme === 'dark' ? 'темную' : 'светлую'}`, 'info');
+}
+
 // Обработчики событий
 $("#btn-save")?.addEventListener('click', saveToDB);
 $("#btn-finish")?.addEventListener('click', finishSession);
@@ -651,5 +1211,6 @@ $("#btn-export")?.addEventListener('click', exportDatabase);
 $("#btn-import")?.addEventListener('click', importDatabase);
 
 // Запуск
+initTheme();
 initApp();
 

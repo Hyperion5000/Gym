@@ -1,5 +1,12 @@
 -- === MESO SQL.js Schema ===
 -- Локальная БД без авторизации
+-- Schema Version: 2
+
+create table if not exists schema_version (
+  version integer primary key,
+  applied_at datetime default current_timestamp,
+  description text
+);
 
 create table if not exists plan (
   id integer primary key autoincrement,

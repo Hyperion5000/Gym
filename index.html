@@ -17,10 +17,13 @@
     <div class="title">MESO</div>
     <nav class="tabs">
       <button data-tab="train" class="tab active">🏋️ Тренировка</button>
+      <button data-tab="history" class="tab">📜 История</button>
       <button data-tab="dash" class="tab">📊 Дашборд</button>
       <button data-tab="prs" class="tab">🏆 Рекорды</button>
+      <button data-tab="faq" class="tab">❓ FAQ</button>
     </nav>
     <div class="actions">
+      <button id="btn-theme" class="btn" title="Переключить тему">🌙</button>
       <button id="btn-export" class="btn">📥 Экспорт</button>
       <button id="btn-import" class="btn">📤 Импорт</button>
     </div>
@@ -109,10 +112,145 @@
       </div>
     </section>
 
+    <section id="history" class="tabpage">
+      <div class="card">
+        <h3>📜 История тренировок</h3>
+        <div class="history-filters">
+          <select id="history-week">
+            <option value="">Все недели</option>
+            <option value="1">Неделя 1</option>
+            <option value="2">Неделя 2</option>
+            <option value="3">Неделя 3</option>
+            <option value="4">Неделя 4</option>
+          </select>
+          <select id="history-day">
+            <option value="">Все дни</option>
+          </select>
+          <button id="btn-load-history" class="btn primary">Загрузить</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </section>
+
     <section id="prs" class="tabpage">
       <div class="card">
         <h3>PR (личные рекорды)</h3>
         <ul id="pr-list"></ul>
+      </div>
+    </section>
+
+    <section id="faq" class="tabpage">
+      <div class="card">
+        <h3>❓ Часто задаваемые вопросы</h3>
+        
+        <div class="faq-item">
+          <h4>Что такое ТМ (тренировочный максимум)?</h4>
+          <p>ТМ — это вес, с которым вы можете выполнить примерно 5-8 повторов с хорошей техникой. Обычно это 85-90% от вашего максимума на 1 повтор. ТМ используется для расчета RIR (запаса повторов).</p>
+          <p><strong>Важно:</strong> ТМ автоматически сохраняется при вводе и подставляется при следующем открытии упражнения.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Что такое RIR?</h4>
+          <p><strong>RIR (Reps in Reserve)</strong> — запас повторов до отказа. Например, RIR 2 означает, что вы могли бы сделать еще 2 повтора.</p>
+          <p>RIR автоматически рассчитывается на основе вашего ТМ, веса и повторов. Цветовая индикация:</p>
+          <ul>
+            <li>🟢 <strong>Зеленый</strong>: попали в целевой RIR (±1)</li>
+            <li>🟡 <strong>Желтый</strong>: близко к цели (±2)</li>
+            <li>🔴 <strong>Красный</strong>: далеко от цели</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Что такое RPE?</h4>
+          <p><strong>RPE (Rate of Perceived Exertion)</strong> — шкала воспринимаемого усилия от 1 до 10. Рассчитывается как: <code>RPE = 10 - RIR</code></p>
+          <p>Например: RIR 2 = RPE 8</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Что такое e1RM?</h4>
+          <p><strong>e1RM (estimated 1 Rep Max)</strong> — расчетный максимум на 1 повтор. Вычисляется по формуле Brzycki: <code>e1RM = вес × (1 + повторы / 30)</code></p>
+          <p>Используется для отслеживания силового прогресса.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Типы упражнений A/B/C/D — что это?</h4>
+          <ul>
+            <li><strong>A</strong> — Основные силовые упражнения (присед, жим, тяга)</li>
+            <li><strong>B</strong> — Тяжелые вспомогательные упражнения</li>
+            <li><strong>C</strong> — Изоляция, высокоповторные упражнения</li>
+            <li><strong>D</strong> — Вспомогательные упражнения для квадрицепсов</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Как работают недели 1-4?</h4>
+          <p>Программа построена на мезоциклах по 4 недели с прогрессивной перегрузкой:</p>
+          <ul>
+            <li><strong>Неделя 1</strong>: Высокий RIR (3-4) — адаптация</li>
+            <li><strong>Неделя 2</strong>: Средний RIR (2-3) — нагрузка</li>
+            <li><strong>Неделя 3</strong>: Низкий RIR (1-2) — пиковая нагрузка</li>
+            <li><strong>Неделя 4</strong>: Высокий RIR (4-5) — восстановление (deload)</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Как использовать кнопки "Заполнить" и "Рассчитать"?</h4>
+          <p><strong>📝 Заполнить</strong>: подставляет вес и повторы из последней тренировки этого упражнения.</p>
+          <p><strong>🧮 Рассчитать</strong>: умный алгоритм рекомендует вес с учетом:</p>
+          <ul>
+            <li>Вашей истории тренировок</li>
+            <li>Целевого RIR текущей недели</li>
+            <li>Целевого количества повторов</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Как работают быстрые кнопки ±2.5кг, ±5кг?</h4>
+          <p><strong>Обычное нажатие</strong>: изменяет вес в активном/первом заполненном поле.</p>
+          <p><strong>Длинный тап (долгое нажатие)</strong>: применяет изменение ко ВСЕМ сетам упражнения.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Зачем нужна кнопка "Завершить тренировку"?</h4>
+          <p>Кнопка "✅ Завершить" появляется после сохранения хотя бы одного сета. При нажатии:</p>
+          <ul>
+            <li>Тренировка помечается как завершенная</li>
+            <li>Сохраняется статистика (количество сетов, тоннаж)</li>
+            <li>Данные учитываются в дашборде</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Как сделать резервную копию данных?</h4>
+          <p>Нажмите кнопку <strong>📥 Экспорт</strong> в верхнем меню. Скачается JSON файл с вашей базой данных.</p>
+          <p><strong>Рекомендация:</strong> делайте экспорт раз в неделю и сохраняйте файлы в облако (Google Drive, iCloud и т.д.)</p>
+          <p>Для восстановления: нажмите <strong>📤 Импорт</strong> и выберите файл.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Данные хранятся локально или на сервере?</h4>
+          <p><strong>Полностью локально!</strong> Все данные хранятся в вашем браузере (IndexedDB). Ничего не отправляется на сервер.</p>
+          <p><strong>Внимание:</strong> если очистите данные браузера — потеряете тренировки. Поэтому важно делать экспорт.</p>
+        </div>
+
+        <div class="faq-item">
+          <h4>Работает ли приложение офлайн?</h4>
+          <p>Да! После первой загрузки приложение работает полностью офлайн. Интернет нужен только для:</p>
+          <ul>
+            <li>Первой загрузки SQL.js (~2 МБ)</li>
+            <li>Обновления приложения</li>
+          </ul>
+        </div>
+
+        <div class="faq-item">
+          <h4>Как установить приложение на iPhone?</h4>
+          <ol>
+            <li>Откройте сайт в <strong>Safari</strong></li>
+            <li>Нажмите кнопку "Поделиться" (квадрат со стрелкой вверх)</li>
+            <li>Выберите "На экран «Домой»"</li>
+            <li>Готово! Приложение появится на главном экране</li>
+          </ol>
+        </div>
       </div>
     </section>
   </main>
@@ -121,12 +259,23 @@
 
   <input type="file" id="file-import" accept=".json" style="display: none;">
 
-  <div id="loading" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: flex; align-items: center; justify-content: center; z-index: 10000; font-size: 18px;">
-    <div style="text-align: center;">
-      <div style="margin-bottom: 16px;">⏳ Загрузка...</div>
-      <div style="font-size: 14px; opacity: 0.8;">Инициализация базы данных</div>
+  <div id="loading" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; align-items: center; justify-content: center; z-index: 10000; font-size: 18px;">
+    <div style="text-align: center; max-width: 320px; padding: 24px;">
+      <div style="margin-bottom: 24px; font-size: 48px; animation: pulse 2s ease-in-out infinite;">💪</div>
+      <div id="loading-text" style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Загрузка MESO</div>
+      <div id="loading-status" style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">Инициализация...</div>
+      <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden;">
+        <div id="loading-progress" style="width: 0%; height: 100%; background: white; transition: width 0.3s ease; border-radius: 2px;"></div>
+      </div>
     </div>
   </div>
+  
+  <style>
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+  </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
   <script>
