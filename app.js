@@ -384,15 +384,28 @@ function initGlobalHandlers() {
     
     inp.classList.remove('input-error');
     computeCard(card);
+  });
+  
+  // Обработчик для Enter - переход на следующее поле
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
     
-    // Автофокус на следующее поле после ввода повторов
-    if (inp.classList.contains('r') && inp.value) {
-      const wInputs = card.querySelectorAll('input.w');
-      const rInputs = card.querySelectorAll('input.r');
-      const all = [...wInputs, ...rInputs];
-      const i = all.indexOf(inp);
-      const next = all[i + 1];
-      if (next) next.focus();
+    const inp = e.target;
+    if (!inp.matches('input')) return;
+    
+    const card = inp.closest('.exercise-card');
+    if (!card) return;
+    
+    e.preventDefault();
+    
+    const wInputs = card.querySelectorAll('input.w');
+    const rInputs = card.querySelectorAll('input.r');
+    const all = [...wInputs, ...rInputs];
+    const i = all.indexOf(inp);
+    const next = all[i + 1];
+    if (next) {
+      next.focus();
+      next.select(); // Выделяем текст для удобства замены
     }
   });
   
