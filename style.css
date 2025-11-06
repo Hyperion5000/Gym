@@ -412,6 +412,25 @@ input::placeholder {
   background: var(--border-light);
 }
 
+.set-row.set-header {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border);
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.set-row.set-header:hover {
+  background: var(--bg-secondary);
+}
+
+.set-header-label {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+  cursor: help;
+}
+
 .set-label {
   font-weight: 600;
   color: var(--text-muted);

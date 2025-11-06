@@ -225,14 +225,22 @@ async function buildExercises() {
         <span>ТМ: <input class="tm-input" type="text" inputmode="decimal" placeholder="0" value="${lastTM || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;"></span>
       </div>
       <div class="sets-list">
+        <div class="set-row set-header">
+          <div class="set-label"></div>
+          <div class="set-header-label">Вес</div>
+          <div class="set-header-label">Повт</div>
+          <div class="set-header-label" title="RIR: Reps in Reserve (Запас повторов до отказа)">RIR</div>
+          <div class="set-header-label" title="RPE: Rate of Perceived Exertion (Воспринимаемое усилие, 1-10)">RPE</div>
+          <div class="set-header-label" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)">e1RM</div>
+        </div>
         ${[1, 2, 3, 4].map((setNum) => `
           <div class="set-row" data-set="${setNum}">
             <div class="set-label">Сет ${setNum}</div>
             <input class="set-input w" type="text" inputmode="decimal" placeholder="Вес" data-set="${setNum}">
             <input class="set-input r" type="text" inputmode="numeric" placeholder="Повт" data-set="${setNum}">
-            <div class="set-value rir" data-set="${setNum}">—</div>
-            <div class="set-value rpe" data-set="${setNum}">—</div>
-            <div class="set-value e1rm" data-set="${setNum}">—</div>
+            <div class="set-value rir" data-set="${setNum}" title="RIR: Reps in Reserve (Запас повторов до отказа)">—</div>
+            <div class="set-value rpe" data-set="${setNum}" title="RPE: Rate of Perceived Exertion (Воспринимаемое усилие, 1-10)">—</div>
+            <div class="set-value e1rm" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)">—</div>
           </div>
         `).join('')}
       </div>
