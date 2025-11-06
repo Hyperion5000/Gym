@@ -265,8 +265,17 @@ async function execute(sql, params = []) {
   if (!db) await initDatabase();
   
   try {
+    // SQL.js использует другой синтаксис для prepared statements
     if (params.length > 0) {
-      db.run(sql, params);
+      const stmt = db.prepare(sql);
+      try {
+        stmt.bind(params);
+        stmt.step();
+        stmt.free();
+      } catch (bindError) {
+        stmt.free();
+        throw bindError;
+      }
     } else {
       db.run(sql);
     }
@@ -275,18 +284,24 @@ async function execute(sql, params = []) {
   } catch (error) {
     // Улучшенная обработка ошибок
     const errorMsg = error.message || String(error);
+    const errorStr = String(error);
     
     // Игнорируем некоторые известные ошибки
     if (errorMsg.includes('UNIQUE constraint') ||
         errorMsg.includes('already exists') ||
-        errorMsg.includes('duplicate')) {
+        errorMsg.includes('duplicate') ||
+        errorStr.includes('UNIQUE constraint') ||
+        errorStr.includes('already exists') ||
+        errorStr.includes('duplicate')) {
       // Это нормально для некоторых операций
       return true;
     }
     
     console.error('Execute failed:', sql);
     console.error('Params:', params);
-    console.error('Error:', errorMsg);
+    console.error('Error message:', errorMsg);
+    console.error('Error string:', errorStr);
+    console.error('Full error:', error);
     throw error;
   }
 }
@@ -409,12 +424,26 @@ async function importDatabase(jsonData) {
 async function loadCSVIntoTable(tableName, csvText) {
   if (!db) await initDatabase();
   
+  // Проверяем, что таблица существует
+  try {
+    const tableCheck = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [tableName]);
+    if (!tableCheck || tableCheck.length === 0) {
+      throw new Error(`Table ${tableName} does not exist. Please create schema first.`);
+    }
+    console.log(`Table ${tableName} exists, proceeding with CSV import...`);
+  } catch (e) {
+    console.error(`Table ${tableName} check failed:`, e);
+    throw e;
+  }
+  
   // Очищаем таблицу перед загрузкой (только для plan)
   if (tableName === 'plan') {
     try {
       await execute('DELETE FROM plan');
+      console.log('Plan table cleared');
     } catch (e) {
-      console.warn('Failed to clear plan table:', e);
+      console.warn('Failed to clear plan table (may be empty):', e.message);
+      // Не критично, продолжаем
     }
   }
   
@@ -488,27 +517,48 @@ async function loadCSVIntoTable(tableName, csvText) {
     values.push(val === '' ? null : val);
     
     if (values.length === headers.length) {
-      const placeholders = headers.map(() => '?').join(', ');
-      const columns = headers.join(', ');
+      // Исключаем колонку id из INSERT (она autoincrement)
+      const columnsToInsert = [];
+      const valuesToInsert = [];
+      
+      for (let j = 0; j < headers.length; j++) {
+        if (headers[j] !== 'id') {
+          columnsToInsert.push(headers[j]);
+          valuesToInsert.push(values[j]);
+        }
+      }
+      
+      const placeholders = columnsToInsert.map(() => '?').join(', ');
+      const columns = columnsToInsert.join(', ');
       const sql = `INSERT INTO ${tableName} (${columns}) VALUES (${placeholders})`;
       
       try {
-        await execute(sql, values);
+        await execute(sql, valuesToInsert);
         successCount++;
       } catch (e) {
         errorCount++;
+        const errorMsg = e.message || String(e);
+        
         // Игнорируем дубликаты и другие известные ошибки
-        if (!e.message.includes('UNIQUE constraint') && 
-            !e.message.includes('already exists') &&
-            !e.message.includes('duplicate')) {
-          console.warn(`Failed to insert row ${i}:`, e.message);
-          console.warn('SQL:', sql);
-          console.warn('Values:', values);
+        if (!errorMsg.includes('UNIQUE constraint') && 
+            !errorMsg.includes('already exists') &&
+            !errorMsg.includes('duplicate') &&
+            !errorMsg.includes('constraint')) {
+          console.error(`Failed to insert row ${i + 1}:`, errorMsg);
+          console.error('SQL:', sql);
+          console.error('Values:', valuesToInsert);
+          console.error('Headers:', headers);
+          console.error('Full error:', e);
+        } else {
+          // Это нормально для некоторых операций
+          console.log(`Row ${i + 1} skipped (duplicate or constraint):`, errorMsg);
         }
       }
     } else {
       errorCount++;
-      console.warn(`Row ${i} has ${values.length} values but expected ${headers.length}`);
+      console.error(`Row ${i + 1} has ${values.length} values but expected ${headers.length} headers`);
+      console.error('Headers:', headers);
+      console.error('Values:', values);
     }
   }
   
