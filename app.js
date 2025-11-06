@@ -95,23 +95,32 @@ async function loadPlan() {
   PLAN = {};
   try {
     const data = await dbModule.query('SELECT * FROM plan ORDER BY day');
-    for (const row of data) {
-      const d = row.day;
-      (PLAN[d] = PLAN[d] || []).push({
-        name: row.exercise,
-        setrep: row.setrep,
-        type: row.type,
-        target: { 1: row.rir_w1, 2: row.rir_w2, 3: row.rir_w3, 4: row.rir_w4 },
-        note: row.note || ''
-      });
+    
+    if (data && data.length > 0) {
+      for (const row of data) {
+        const d = row.day;
+        if (d) {
+          (PLAN[d] = PLAN[d] || []).push({
+            name: row.exercise,
+            setrep: row.setrep,
+            type: row.type,
+            target: { 1: row.rir_w1, 2: row.rir_w2, 3: row.rir_w3, 4: row.rir_w4 },
+            note: row.note || ''
+          });
+        }
+      }
+      
+      console.log(`Plan loaded: ${data.length} exercises in ${Object.keys(PLAN).length} days`);
     }
     
     // Если план пустой, загружаем из CSV
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
+      console.log('Plan is empty, loading from CSV...');
       await loadPlanFromCSV();
     }
   } catch (error) {
-    console.error('Failed to load plan:', error);
+    console.error('Failed to load plan from DB:', error);
+    // Пытаемся загрузить из CSV
     await loadPlanFromCSV();
   }
 }
@@ -127,14 +136,18 @@ async function loadPlanFromCSV() {
     if (!csvText || csvText.trim().length === 0) {
       throw new Error('plan.csv is empty');
     }
+    
+    console.log('Loading plan from CSV...');
     await dbModule.loadCSVIntoTable('plan', csvText);
+    
+    // Перезагружаем план из БД
     await loadPlan();
+    console.log('Plan loaded successfully');
   } catch (error) {
     console.error('Failed to load plan from CSV:', error);
     const errorMsg = `Не удалось загрузить план тренировок: ${error.message}`;
     console.error(errorMsg);
-    // Не показываем alert, чтобы не блокировать интерфейс
-    // Просто логируем ошибку
+    showNotification(errorMsg, 'error');
   }
 }
 

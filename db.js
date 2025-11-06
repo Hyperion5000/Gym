@@ -273,7 +273,20 @@ async function execute(sql, params = []) {
     await saveDatabase();
     return true;
   } catch (error) {
-    console.error('Execute failed:', sql, error);
+    // Улучшенная обработка ошибок
+    const errorMsg = error.message || String(error);
+    
+    // Игнорируем некоторые известные ошибки
+    if (errorMsg.includes('UNIQUE constraint') ||
+        errorMsg.includes('already exists') ||
+        errorMsg.includes('duplicate')) {
+      // Это нормально для некоторых операций
+      return true;
+    }
+    
+    console.error('Execute failed:', sql);
+    console.error('Params:', params);
+    console.error('Error:', errorMsg);
     throw error;
   }
 }
@@ -396,6 +409,15 @@ async function importDatabase(jsonData) {
 async function loadCSVIntoTable(tableName, csvText) {
   if (!db) await initDatabase();
   
+  // Очищаем таблицу перед загрузкой (только для plan)
+  if (tableName === 'plan') {
+    try {
+      await execute('DELETE FROM plan');
+    } catch (e) {
+      console.warn('Failed to clear plan table:', e);
+    }
+  }
+  
   // Парсим CSV с учетом кавычек
   const lines = [];
   let currentLine = '';
@@ -419,7 +441,10 @@ async function loadCSVIntoTable(tableName, csvText) {
     lines.push(currentLine);
   }
   
-  if (lines.length < 2) return;
+  if (lines.length < 2) {
+    console.warn('CSV file has less than 2 lines');
+    return;
+  }
   
   // Парсим заголовки
   const headers = lines[0].split(',').map(h => {
@@ -429,6 +454,9 @@ async function loadCSVIntoTable(tableName, csvText) {
     }
     return h;
   });
+  
+  let successCount = 0;
+  let errorCount = 0;
   
   // Парсим данные
   for (let i = 1; i < lines.length; i++) {
@@ -466,14 +494,25 @@ async function loadCSVIntoTable(tableName, csvText) {
       
       try {
         await execute(sql, values);
+        successCount++;
       } catch (e) {
-        // Игнорируем дубликаты
-        if (!e.message.includes('UNIQUE constraint')) {
-          console.warn('Failed to insert row:', e);
+        errorCount++;
+        // Игнорируем дубликаты и другие известные ошибки
+        if (!e.message.includes('UNIQUE constraint') && 
+            !e.message.includes('already exists') &&
+            !e.message.includes('duplicate')) {
+          console.warn(`Failed to insert row ${i}:`, e.message);
+          console.warn('SQL:', sql);
+          console.warn('Values:', values);
         }
       }
+    } else {
+      errorCount++;
+      console.warn(`Row ${i} has ${values.length} values but expected ${headers.length}`);
     }
   }
+  
+  console.log(`CSV import: ${successCount} rows inserted, ${errorCount} errors`);
 }
 
 // Экспорт
