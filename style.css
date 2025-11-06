@@ -785,6 +785,11 @@ ul li:last-child {
     color: var(--text-muted);
   }
   
+  /* Скрываем пустые значения e1RM */
+  .set-row .set-value.hidden {
+    display: none !important;
+  }
+  
   .exercise-info {
     flex-direction: column;
     gap: 8px;

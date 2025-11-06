@@ -469,10 +469,10 @@ function computeCard(card) {
     // Показываем e1RM только если есть вес и повторы
     if (e1 != null && w > 0 && r > 0) {
       e1Cell.textContent = e1;
-      e1Cell.style.display = '';
+      e1Cell.classList.remove('hidden');
     } else {
       e1Cell.textContent = '';
-      e1Cell.style.display = 'none';
+      e1Cell.classList.add('hidden');
     }
   });
 }
