@@ -216,7 +216,10 @@ async function buildExercises() {
     card.innerHTML = `
       <div class="exercise-header">
         <span class="exercise-number">${idx + 1}</span>
-        <h3 class="exercise-name">${ex.name}</h3>
+        <div class="exercise-title-block">
+          <h3 class="exercise-name">${ex.name}</h3>
+          <div class="exercise-hint" data-exercise="${ex.name}"></div>
+        </div>
         <span class="exercise-type type${ex.type}">${ex.type}</span>
       </div>
       <div class="exercise-info">
@@ -229,8 +232,6 @@ async function buildExercises() {
           <div class="set-label"></div>
           <div class="set-header-label">Вес</div>
           <div class="set-header-label">Повт</div>
-          <div class="set-header-label" title="RIR: Reps in Reserve (Запас повторов до отказа)">RIR</div>
-          <div class="set-header-label" title="RPE: Rate of Perceived Exertion (Воспринимаемое усилие, 1-10)">RPE</div>
           <div class="set-header-label" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)">e1RM</div>
         </div>
         ${[1, 2, 3, 4].map((setNum) => `
@@ -238,9 +239,7 @@ async function buildExercises() {
             <div class="set-label">Сет ${setNum}</div>
             <input class="set-input w" type="text" inputmode="decimal" placeholder="Вес" data-set="${setNum}">
             <input class="set-input r" type="text" inputmode="numeric" placeholder="Повт" data-set="${setNum}">
-            <div class="set-value rir" data-set="${setNum}" title="RIR: Reps in Reserve (Запас повторов до отказа)">—</div>
-            <div class="set-value rpe" data-set="${setNum}" title="RPE: Rate of Perceived Exertion (Воспринимаемое усилие, 1-10)">—</div>
-            <div class="set-value e1rm" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)">—</div>
+            <div class="set-value e1rm" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)"></div>
           </div>
         `).join('')}
       </div>
@@ -459,34 +458,21 @@ function initGlobalHandlers() {
 // Вычисление значений для карточки
 function computeCard(card) {
   const tm = Number(normalizeNumber(card.querySelector('.tm-input')?.value || 0));
-  const targetText = card.dataset.target || '';
-  const target = targetToNumber(targetText);
-  const week = Number($("#week").value);
-  const exName = card.dataset.exercise;
-  const ex = Object.values(PLAN).flat().find(e => e.name === exName);
-  const exTarget = ex ? targetToNumber(ex.target[week]) : null;
   
   [1, 2, 3, 4].forEach((setNum) => {
     const w = Number(normalizeNumber(card.querySelector(`input.w[data-set="${setNum}"]`)?.value || 0));
     const r = Number(normalizeNumber(card.querySelector(`input.r[data-set="${setNum}"]`)?.value || 0));
-    const rirCell = card.querySelector(`.rir[data-set="${setNum}"]`);
-    const rpeCell = card.querySelector(`.rpe[data-set="${setNum}"]`);
     const e1Cell = card.querySelector(`.e1rm[data-set="${setNum}"]`);
     
-    const rir = estRIR(tm, w, r);
-    const rpe = rpeFromRir(rir);
     const e1 = e1rm(w, r);
     
-    rirCell.textContent = (rir == null) ? '—' : rir;
-    rpeCell.textContent = (rpe == null) ? '—' : rpe;
-    e1Cell.textContent = (e1 == null) ? '—' : e1;
-    
-    rirCell.classList.remove("ok", "warn", "bad");
-    if (rir != null && exTarget != null) {
-      const diff = Math.abs(rir - exTarget);
-      if (diff <= 1) rirCell.classList.add("ok");
-      else if (diff <= 2) rirCell.classList.add("warn");
-      else rirCell.classList.add("bad");
+    // Показываем e1RM только если есть вес и повторы
+    if (e1 != null && w > 0 && r > 0) {
+      e1Cell.textContent = e1;
+      e1Cell.style.display = '';
+    } else {
+      e1Cell.textContent = '';
+      e1Cell.style.display = 'none';
     }
   });
 }
@@ -498,7 +484,6 @@ async function loadHints() {
   const exNames = rows.map(x => x.name);
   
   if (!exNames.length) {
-    $("#hints-list").innerHTML = '';
     return;
   }
   
@@ -512,48 +497,38 @@ async function loadHints() {
     const byEx = {};
     data.forEach(x => byEx[x.exercise] = x);
     
-    const container = $("#hints-list");
-    container.innerHTML = '';
-    
+    // Добавляем подсказки непосредственно в карточки упражнений
     rows.forEach(ex => {
+      const hintContainer = document.querySelector(`.exercise-hint[data-exercise="${ex.name}"]`);
+      if (!hintContainer) return;
+      
       const h = byEx[ex.name];
-      const div = document.createElement("div");
-      div.className = 'hint';
       
       if (h) {
-        div.innerHTML = `
-          <b>${ex.name}</b> • ${h.weight}×${h.reps} @RIR ${h.rir ?? '—'}
-          <span class="action-mini">
-            <button class="btn mini" data-act="fill-last" data-ex="${ex.name}">📝 Заполнить</button>
-            <button class="btn mini" data-act="suggest" data-ex="${ex.name}">🧮 Рассчитать</button>
-          </span>
+        hintContainer.innerHTML = `
+          <span class="hint-text">Прошлый: ${h.weight}кг×${h.reps} (e1RM: ${h.e1rm ?? '—'}кг)</span>
+          <button class="btn-icon" data-act="fill-last" data-ex="${ex.name}" title="Заполнить прошлыми значениями">📝</button>
         `;
+        hintContainer.style.display = 'flex';
       } else {
-        div.innerHTML = `
-          <b>${ex.name}</b> • <span class="empty-state">Нет данных — заполните первый подход</span>
-          <span class="action-mini">
-            <button class="btn mini" data-act="suggest" data-ex="${ex.name}">🧮 Рассчитать</button>
-          </span>
-        `;
+        hintContainer.style.display = 'none';
       }
-      
-      container.appendChild(div);
     });
     
-    container.addEventListener('click', async (e) => {
-      const b = e.target.closest('button');
-      if (!b) return;
-      const exName = b.dataset.ex;
-      if (b.dataset.act === 'fill-last') {
-        fillFromLast(exName);
-      }
-      if (b.dataset.act === 'suggest') {
-        await suggestForExercise(exName);
-      }
-    }, { once: true });
+    // Добавляем обработчик клика для кнопок в подсказках
+    document.querySelectorAll('.exercise-hint button').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const exName = btn.dataset.ex;
+        if (btn.dataset.act === 'fill-last') {
+          fillFromLast(exName);
+        }
+        if (btn.dataset.act === 'suggest') {
+          await suggestForExercise(exName);
+        }
+      });
+    });
   } catch (error) {
     console.warn('Failed to load hints:', error);
-    $("#hints-list").innerHTML = '';
   }
 }
 
@@ -562,13 +537,11 @@ function fillFromLast(exName) {
   const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
   if (!card) return;
   
-  const hint = Array.from($("#hints-list").children).find(d => 
-    d.querySelector('b')?.textContent === exName
-  );
-  if (!hint) return;
+  const hintContainer = card.querySelector('.exercise-hint');
+  if (!hintContainer) return;
   
-  const text = hint.textContent;
-  const m = text.match(/(\d+(?:[\.,]\d+)?)×(\d+)/);
+  const text = hintContainer.textContent;
+  const m = text.match(/(\d+(?:[\.,]\d+)?)кг×(\d+)/);
   if (!m) return;
   
   const w = m[1].replace(',', '.');
