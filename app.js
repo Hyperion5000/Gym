@@ -1,19 +1,58 @@
 // === MESO App (SQL.js) ===
 import * as dbModule from './db.js';
 
+// === КОНСТАНТЫ ===
+const LIMITS = {
+  MAX_WEIGHT: 500,
+  MIN_WEIGHT: 0.5,
+  MAX_REPS: 100,
+  MIN_REPS: 1,
+  MAX_TM: 500,
+  E1RM_FACTOR: 30, // Epley formula factor
+  WEIGHT_ROUNDING: 2.5, // округление веса
+  NOTIFICATION_DURATION: 3000,
+  AUTOSAVE_INTERVAL: 5000, // автосохранение черновика
+  DEBOUNCE_DELAY: 500 // задержка для debounce
+};
+
 let PLAN = {};
 let CURRENT_SESSION = null;
 const $ = (s) => document.querySelector(s);
 
+// DOM Cache
+const DOM = {
+  week: null,
+  day: null,
+  date: null,
+  exercisesList: null,
+  sessionStatus: null,
+  btnFinish: null,
+  btnSave: null
+};
+
+// === УТИЛИТЫ ===
+// Debounce функция
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // Вспомогательные функции
 function e1rm(w, r) {
   if (!w || !r) return null;
-  return Math.round(w * (1 + r / 30) * 10) / 10;
+  return Math.round(w * (1 + r / LIMITS.E1RM_FACTOR) * 10) / 10;
 }
 
 function estRIR(tm, w, r) {
   if (!tm || !w || !r) return null;
-  const reps0 = 30 * (tm / w - 1);
+  const reps0 = LIMITS.E1RM_FACTOR * (tm / w - 1);
   const rir = Math.max(0, reps0 - r);
   return Math.round(rir * 10) / 10;
 }
@@ -43,35 +82,47 @@ function normalizeNumber(v) {
   return v;
 }
 
-// Валидация веса
-function validateWeight(weight) {
-  const w = Number(weight);
-  if (isNaN(w)) return { valid: false, message: 'Введите корректное число' };
-  if (w < 0) return { valid: false, message: 'Вес не может быть отрицательным' };
-  if (w > 500) return { valid: false, message: 'Вес выглядит подозрительно большим (>500кг)' };
-  if (w > 0 && w < 0.5) return { valid: false, message: 'Вес слишком мал (<0.5кг)' };
+// === ВАЛИДАЦИЯ (ОБОБЩЕННАЯ) ===
+function validateNumber(value, options = {}) {
+  const {
+    min = -Infinity,
+    max = Infinity,
+    integer = false,
+    positive = false,
+    fieldName = 'Значение'
+  } = options;
+  
+  const n = Number(value);
+  if (isNaN(n)) return { valid: false, message: `${fieldName}: введите корректное число` };
+  if (positive && n <= 0) return { valid: false, message: `${fieldName} должно быть > 0` };
+  if (n < min) return { valid: false, message: `${fieldName} < ${min}` };
+  if (n > max) return { valid: false, message: `${fieldName} > ${max} (подозрительно большое)` };
+  if (integer && !Number.isInteger(n)) return { valid: false, message: `${fieldName} должно быть целым числом` };
   return { valid: true };
 }
 
-// Валидация повторов
-function validateReps(reps) {
-  const r = Number(reps);
-  if (isNaN(r)) return { valid: false, message: 'Введите корректное число' };
-  if (r < 0) return { valid: false, message: 'Повторы не могут быть отрицательными' };
-  if (!Number.isInteger(r)) return { valid: false, message: 'Повторы должны быть целым числом' };
-  if (r > 100) return { valid: false, message: 'Слишком много повторов (>100)' };
-  if (r === 0) return { valid: false, message: 'Повторы должны быть больше 0' };
-  return { valid: true };
-}
+// Специализированные функции валидации
+const validateWeight = (w) => validateNumber(w, { 
+  min: LIMITS.MIN_WEIGHT, 
+  max: LIMITS.MAX_WEIGHT, 
+  positive: true, 
+  fieldName: 'Вес' 
+});
 
-// Валидация ТМ
-function validateTM(tm) {
-  const t = Number(tm);
-  if (isNaN(t)) return { valid: false, message: 'Введите корректное число' };
-  if (t <= 0) return { valid: false, message: 'ТМ должен быть больше 0' };
-  if (t > 500) return { valid: false, message: 'ТМ выглядит подозрительно большим (>500кг)' };
-  return { valid: true };
-}
+const validateReps = (r) => validateNumber(r, { 
+  min: LIMITS.MIN_REPS, 
+  max: LIMITS.MAX_REPS, 
+  integer: true, 
+  positive: true,
+  fieldName: 'Повторы' 
+});
+
+const validateTM = (tm) => validateNumber(tm, { 
+  min: 0, 
+  max: LIMITS.MAX_TM, 
+  positive: true, 
+  fieldName: 'ТМ' 
+});
 
 // Показать уведомление
 function showNotification(message, type = 'info') {
@@ -87,7 +138,7 @@ function showNotification(message, type = 'info') {
   setTimeout(() => {
     notification.classList.remove('show');
     setTimeout(() => notification.remove(), 300);
-  }, 3000);
+  }, LIMITS.NOTIFICATION_DURATION);
 }
 
 // Загрузка плана тренировок
@@ -182,9 +233,20 @@ async function loadPlanFromCSV() {
   }
 }
 
+// Кэширование DOM элементов
+function cacheDOM() {
+  DOM.week = $("#week");
+  DOM.day = $("#day");
+  DOM.date = $("#date");
+  DOM.exercisesList = $("#exercises-list");
+  DOM.sessionStatus = $("#session-status");
+  DOM.btnFinish = $("#btn-finish");
+  DOM.btnSave = $("#btn-save");
+}
+
 // Построение опций дней
 async function buildDayOptions() {
-  const sel = $("#day");
+  const sel = DOM.day || $("#day");
   sel.innerHTML = "";
   Object.keys(PLAN).forEach(d => {
     const o = document.createElement("option");
@@ -197,20 +259,30 @@ async function buildDayOptions() {
 
 // Построение карточек упражнений
 async function buildExercises() {
-  const container = $("#exercises-list");
-  const day = $("#day").value;
-  const week = $("#week").value;
+  const container = DOM.exercisesList || $("#exercises-list");
+  const day = (DOM.day || $("#day")).value;
+  const week = (DOM.week || $("#week")).value;
   const rows = PLAN[day] || [];
   
   container.innerHTML = "";
+  
+  // ОПТИМИЗАЦИЯ: Загружаем все TM одним запросом
+  const exerciseNames = rows.map(r => r.name);
+  const tmData = exerciseNames.length > 0 
+    ? await dbModule.query(
+        `SELECT exercise, tm_kg FROM tm WHERE exercise IN (${exerciseNames.map(() => '?').join(',')})`,
+        exerciseNames
+      )
+    : [];
+  const tmMap = Object.fromEntries(tmData.map(t => [t.exercise, t.tm_kg]));
   
   for (const [idx, ex] of rows.entries()) {
     const card = document.createElement("div");
     card.className = `exercise-card type${ex.type}`;
     card.dataset.exercise = ex.name;
     
-    // Загружаем последний ТМ
-    const lastTM = await loadLastTM(ex.name);
+    // O(1) lookup вместо await запроса к БД
+    const lastTM = tmMap[ex.name] || null;
     
     card.dataset.target = ex.target[week] || '';
     card.innerHTML = `
@@ -227,6 +299,10 @@ async function buildExercises() {
         <span>Цел. RIR: ${ex.target[week] || ''}</span>
         <span>ТМ: <input class="tm-input" type="text" inputmode="decimal" placeholder="0" value="${lastTM || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;"></span>
       </div>
+      <div class="exercise-progress">
+        <div class="progress-bar" style="width: 0%"></div>
+      </div>
+      <span class="progress-text">0/4 сетов</span>
       <div class="sets-list">
         <div class="set-row set-header">
           <div class="set-label"></div>
@@ -236,7 +312,10 @@ async function buildExercises() {
         </div>
               ${[1, 2, 3, 4].map((setNum) => `
                 <div class="set-row" data-set="${setNum}">
-                  <div class="set-label">Сет ${setNum}</div>
+                  <div class="set-label">
+                    Сет ${setNum}
+                    ${setNum > 1 ? `<button class="btn-copy-set" data-copy-from="${setNum - 1}" title="Копировать из предыдущего сета">↑</button>` : ''}
+                  </div>
                   <input class="set-input w" type="text" inputmode="decimal" placeholder="Вес" data-set="${setNum}">
                   <input class="set-input r" type="text" inputmode="numeric" placeholder="Повт" data-set="${setNum}">
                   <div class="set-value e1rm hidden" data-set="${setNum}" title="e1RM: Estimated 1 Rep Max (Расчетный максимум на 1 повторение)"></div>
@@ -255,8 +334,8 @@ async function buildExercises() {
 
 // Прогноз прогресса для следующей недели
 async function generateProgression() {
-  const currentWeek = Number($("#week").value);
-  const day = $("#day").value;
+  const currentWeek = Number((DOM.week || $("#week")).value);
+  const day = (DOM.day || $("#day")).value;
   const rows = PLAN[day] || [];
   
   const progressionData = [];
@@ -284,14 +363,14 @@ async function generateProgression() {
       const targetReps = 8; // средние повторы
       
       // Рекомендуемый вес
-      let suggestedWeight = avgE1RM / (1 + targetReps / 30);
+      let suggestedWeight = avgE1RM / (1 + targetReps / LIMITS.E1RM_FACTOR);
       
       // Учитываем тренд
       if (trend > 0) {
         suggestedWeight += trend * 0.5; // консервативная прогрессия
       }
       
-      suggestedWeight = Math.round(suggestedWeight / 2.5) * 2.5; // округляем до 2.5кг
+      suggestedWeight = Math.round(suggestedWeight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
       
       progressionData.push({
         exercise: ex.name,
@@ -373,9 +452,121 @@ async function saveTM(exercise, tm) {
   }
 }
 
+// Debounced версия saveTM
+const debouncedSaveTM = debounce(saveTM, LIMITS.DEBOUNCE_DELAY);
+
+// === АВТОСОХРАНЕНИЕ ЧЕРНОВИКА ===
+function saveDraft() {
+  try {
+    const draft = {
+      week: (DOM.week || $("#week")).value,
+      day: (DOM.day || $("#day")).value,
+      date: (DOM.date || $("#date")).value,
+      exercises: {}
+    };
+    
+    // Сохраняем введенные данные
+    document.querySelectorAll('.exercise-card').forEach(card => {
+      const exName = card.dataset.exercise;
+      const tm = card.querySelector('.tm-input')?.value || '';
+      const sets = [];
+      
+      [1, 2, 3, 4].forEach(setNum => {
+        const w = card.querySelector(`input.w[data-set="${setNum}"]`)?.value || '';
+        const r = card.querySelector(`input.r[data-set="${setNum}"]`)?.value || '';
+        if (w || r) {
+          sets.push({ set: setNum, weight: w, reps: r });
+        }
+      });
+      
+      if (tm || sets.length > 0) {
+        draft.exercises[exName] = { tm, sets };
+      }
+    });
+    
+    localStorage.setItem('workout_draft', JSON.stringify(draft));
+  } catch (error) {
+    console.warn('Failed to save draft:', error);
+  }
+}
+
+function restoreDraft() {
+  try {
+    const draftStr = localStorage.getItem('workout_draft');
+    if (!draftStr) return false;
+    
+    const draft = JSON.parse(draftStr);
+    
+    // Восстанавливаем дату, неделю, день
+    if (draft.week && DOM.week) DOM.week.value = draft.week;
+    if (draft.day && DOM.day) DOM.day.value = draft.day;
+    if (draft.date && DOM.date) DOM.date.value = draft.date;
+    
+    // Ждем пока упражнения загрузятся, затем восстанавливаем значения
+    setTimeout(() => {
+      Object.entries(draft.exercises || {}).forEach(([exName, data]) => {
+        const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
+        if (!card) return;
+        
+        const tmInput = card.querySelector('.tm-input');
+        if (tmInput && data.tm) tmInput.value = data.tm;
+        
+        (data.sets || []).forEach(({ set, weight, reps }) => {
+          const wInput = card.querySelector(`input.w[data-set="${set}"]`);
+          const rInput = card.querySelector(`input.r[data-set="${set}"]`);
+          if (wInput) wInput.value = weight;
+          if (rInput) rInput.value = reps;
+        });
+        
+        computeCard(card);
+      });
+      
+      showNotification('Восстановлен черновик тренировки', 'info');
+    }, 500);
+    
+    return true;
+  } catch (error) {
+    console.warn('Failed to restore draft:', error);
+    return false;
+  }
+}
+
+function clearDraft() {
+  localStorage.removeItem('workout_draft');
+}
+
 // Инициализация глобального обработчика событий (Event Delegation)
 function initGlobalHandlers() {
   const container = $("#exercises-list");
+  
+  // Автосохранение черновика каждые 5 секунд
+  setInterval(saveDraft, LIMITS.AUTOSAVE_INTERVAL);
+  
+  // Обработчик кнопок копирования сета
+  container.addEventListener('click', (e) => {
+    if (e.target.classList.contains('btn-copy-set')) {
+      const card = e.target.closest('.exercise-card');
+      const toSet = e.target.closest('.set-row').dataset.set;
+      const fromSet = Number(toSet) - 1;
+      
+      const fromW = card.querySelector(`input.w[data-set="${fromSet}"]`).value;
+      const fromR = card.querySelector(`input.r[data-set="${fromSet}"]`).value;
+      
+      if (!fromW && !fromR) {
+        showNotification('Предыдущий сет пуст', 'warning');
+        return;
+      }
+      
+      const toW = card.querySelector(`input.w[data-set="${toSet}"]`);
+      const toR = card.querySelector(`input.r[data-set="${toSet}"]`);
+      
+      toW.value = fromW;
+      toR.value = fromR;
+      
+      computeCard(card);
+      showNotification('Сет скопирован', 'success');
+    }
+  });
   
   // Единый обработчик для всех input событий
   container.addEventListener('input', (e) => {
@@ -436,7 +627,7 @@ function initGlobalHandlers() {
           inp.classList.add('input-error');
           showNotification(validation.message, 'warning');
         } else {
-          await saveTM(exName, value);
+          debouncedSaveTM(exName, value); // Используем debounced версию
         }
       } else if (inp.classList.contains('w')) {
         validation = validateWeight(value);
@@ -453,6 +644,29 @@ function initGlobalHandlers() {
       }
     }
   }, true); // capture phase для blur
+}
+
+// Обновление прогресс-бара заполнения сетов
+function updateSetProgress(card) {
+  const wInputs = card.querySelectorAll('input.w');
+  const rInputs = card.querySelectorAll('input.r');
+  
+  let filledSets = 0;
+  const totalSets = wInputs.length;
+  
+  for (let i = 0; i < totalSets; i++) {
+    const w = wInputs[i].value.trim();
+    const r = rInputs[i].value.trim();
+    if (w && r) filledSets++;
+  }
+  
+  const percent = (filledSets / totalSets) * 100;
+  
+  const progressBar = card.querySelector('.progress-bar');
+  const progressText = card.querySelector('.progress-text');
+  
+  if (progressBar) progressBar.style.width = `${percent}%`;
+  if (progressText) progressText.textContent = `${filledSets}/${totalSets} сетов`;
 }
 
 // Вычисление значений для карточки
@@ -475,6 +689,9 @@ function computeCard(card) {
       e1Cell.classList.add('hidden');
     }
   });
+  
+  // Обновляем прогресс-бар
+  updateSetProgress(card);
 }
 
 // Загрузка подсказок
@@ -561,8 +778,8 @@ function fillFromLast(exName) {
 
 // Рекомендация веса
 async function suggestForExercise(exName) {
-  const week = Number($("#week").value);
-  const day = $("#day").value;
+  const week = Number((DOM.week || $("#week")).value);
+  const day = (DOM.day || $("#day")).value;
   const item = (PLAN[day] || []).find(x => x.name === exName);
   if (!item) return;
   
@@ -581,15 +798,15 @@ async function suggestForExercise(exName) {
       return;
     }
     
-    const tm_est = lastSet.weight / (1 + lastSet.reps / 30);
-    let w_new = tm_est * (1 + target_reps / 30);
+    const tm_est = lastSet.weight / (1 + lastSet.reps / LIMITS.E1RM_FACTOR);
+    let w_new = tm_est * (1 + target_reps / LIMITS.E1RM_FACTOR);
     
     if (target_rir != null && lastSet.rir != null) {
-      if (target_rir > lastSet.rir) w_new -= 2.5;
-      else if (target_rir < lastSet.rir) w_new += 2.5;
+      if (target_rir > lastSet.rir) w_new -= LIMITS.WEIGHT_ROUNDING;
+      else if (target_rir < lastSet.rir) w_new += LIMITS.WEIGHT_ROUNDING;
     }
     
-    w_new = Math.round(w_new / 2.5) * 2.5;
+    w_new = Math.round(w_new / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
     if (w_new < 0) w_new = 0;
     
     const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
@@ -615,9 +832,9 @@ async function suggestForExercise(exName) {
 // Сбор данных из карточек
 function collectRows() {
   const out = [];
-  const date = $("#date").value;
-  const week = Number($("#week").value);
-  const day = $("#day").value;
+  const date = (DOM.date || $("#date")).value;
+  const week = Number((DOM.week || $("#week")).value);
+  const day = (DOM.day || $("#day")).value;
   
   document.querySelectorAll('.exercise-card').forEach(card => {
     const exer = card.dataset.exercise;
@@ -697,6 +914,9 @@ async function saveToDB() {
     
     showNotification(`Сохранено: ${rows.length} сетов`, 'success');
     
+    // Очищаем черновик после успешного сохранения
+    clearDraft();
+    
     // Обновляем статус сессии после сохранения
     await ensureSession();
   } catch (error) {
@@ -707,9 +927,9 @@ async function saveToDB() {
 
 // Сессии
 async function ensureSession() {
-  const date = $("#date").value;
-  const week = Number($("#week").value);
-  const day = $("#day").value;
+  const date = (DOM.date || $("#date")).value;
+  const week = Number((DOM.week || $("#week")).value);
+  const day = (DOM.day || $("#day")).value;
   
   try {
     const existing = await dbModule.getOne(
@@ -738,10 +958,10 @@ async function ensureSession() {
     );
     
     const statusText = `Тренировка: ${day} • Сеты: ${stats?.sets || 0} • Тоннаж: ${Math.round(stats?.tonnage || 0)} кг`;
-    $("#session-status").textContent = statusText;
+    (DOM.sessionStatus || $("#session-status")).textContent = statusText;
     
     // Показываем/скрываем кнопку завершения
-    const finishBtn = $("#btn-finish");
+    const finishBtn = DOM.btnFinish || $("#btn-finish");
     if (stats?.sets > 0) {
       finishBtn.style.display = 'inline-flex';
     } else {
@@ -768,8 +988,8 @@ async function finishSession() {
     );
     
     showNotification(`Тренировка завершена! ${stats?.sets || 0} сетов, ${Math.round(stats?.tonnage || 0)} кг тоннажа`, 'success');
-    $("#session-status").textContent = 'Тренировка завершена ✓';
-    $("#btn-finish").style.display = 'none';
+    (DOM.sessionStatus || $("#session-status")).textContent = 'Тренировка завершена ✓';
+    (DOM.btnFinish || $("#btn-finish")).style.display = 'none';
     CURRENT_SESSION = null;
   } catch (error) {
     console.error('Failed to finish session:', error);
@@ -777,9 +997,76 @@ async function finishSession() {
   }
 }
 
+// === LAZY LOADING ДЛЯ БИБЛИОТЕК ===
+// Функция для динамической загрузки Chart.js (если потребуется в будущем)
+async function loadChartJS() {
+  if (window.Chart) return window.Chart; // уже загружен
+  
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+    script.onload = () => resolve(window.Chart);
+    script.onerror = () => reject(new Error('Failed to load Chart.js'));
+    document.head.appendChild(script);
+  });
+}
+
+// Использование (пример):
+// async function showChart() {
+//   const Chart = await loadChartJS();
+//   // теперь можно рисовать графики
+// }
+
+// Тепловая карта тренировок
+async function renderHeatmap() {
+  try {
+    const data = await dbModule.query(`
+      SELECT date, COUNT(DISTINCT exercise) as exercises_count, SUM(CASE WHEN weight > 0 AND reps > 0 THEN 1 ELSE 0 END) as sets_count
+      FROM tracker 
+      WHERE date >= date('now', '-90 days')
+      GROUP BY date
+      ORDER BY date
+    `);
+    
+    const heatmapContainer = document.getElementById('heatmap-container');
+    if (!heatmapContainer) return;
+    
+    const heatmap = document.createElement('div');
+    heatmap.className = 'heatmap';
+    
+    // Генерируем 91 день (13 недель)
+    const today = new Date();
+    for (let i = 90; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().slice(0, 10);
+      
+      const dayData = data.find(d => d.date === dateStr);
+      const intensity = dayData ? Math.min(dayData.sets_count / 20, 1) : 0;
+      
+      const cell = document.createElement('div');
+      cell.className = 'heatmap-cell';
+      if (intensity > 0) cell.classList.add('active');
+      cell.style.opacity = intensity || 0.1;
+      cell.title = `${dateStr}: ${dayData?.sets_count || 0} сетов, ${dayData?.exercises_count || 0} упражнений`;
+      heatmap.appendChild(cell);
+    }
+    
+    heatmapContainer.innerHTML = '<h4>📅 Активность за 90 дней</h4>';
+    heatmapContainer.appendChild(heatmap);
+    
+    const legend = document.createElement('div');
+    legend.className = 'heatmap-legend';
+    legend.innerHTML = '<span>Меньше</span><span>Больше тренировок</span>';
+    heatmapContainer.appendChild(legend);
+  } catch (error) {
+    console.warn('Failed to render heatmap:', error);
+  }
+}
+
 // Дашборд
 async function loadDashboard() {
-  const week = Number($("#week").value);
+  const week = Number((DOM.week || $("#week")).value);
   
   try {
     const vol = await dbModule.getOne(
@@ -816,6 +1103,9 @@ async function loadDashboard() {
       li.textContent = `${x.exercise}: ${x.best_e1rm} кг (${x.date})`;
       ul2.appendChild(li);
     });
+    
+    // Загружаем тепловую карту
+    await renderHeatmap();
   } catch (error) {
     console.error('Failed to load dashboard:', error);
   }
@@ -1005,7 +1295,7 @@ async function editSet(id) {
     
     // Пересчитываем значения
     const e1 = e1rm(weight, reps);
-    const rir = set.target_rir ? estRIR(weight * (1 + reps / 30), weight, reps) : null;
+    const rir = set.target_rir ? estRIR(weight * (1 + reps / LIMITS.E1RM_FACTOR), weight, reps) : null;
     const rpe = rpeFromRir(rir);
     
     await dbModule.execute(
@@ -1098,7 +1388,11 @@ async function initApp() {
     await dbModule.initDatabase();
     
     updateProgress(92, 'Загрузка плана тренировок...');
-    $("#date").value = todayISO();
+    
+    // Кэшируем DOM элементы ПЕРЕД использованием
+    cacheDOM();
+    
+    DOM.date.value = todayISO();
     await loadPlan();
     
     updateProgress(95, 'Инициализация интерфейса...');
@@ -1108,12 +1402,18 @@ async function initApp() {
     
     await buildDayOptions();
     
-    $("#week").addEventListener('change', async () => {
+    // Проверяем наличие черновика и предлагаем восстановить
+    const hasDraft = localStorage.getItem('workout_draft');
+    if (hasDraft) {
+      restoreDraft();
+    }
+    
+    DOM.week.addEventListener('change', async () => {
       await buildExercises();
       await loadDashboard();
     });
     
-    $("#day").addEventListener('change', async () => {
+    DOM.day.addEventListener('change', async () => {
       await buildExercises();
     });
     
@@ -1151,6 +1451,28 @@ async function initApp() {
       alert('Ошибка инициализации приложения: ' + error.message);
     }
   }
+}
+
+// === ИНДИКАТОР ОФЛАЙН-РЕЖИМА ===
+function setupOnlineIndicator() {
+  const indicator = document.createElement('div');
+  indicator.id = 'network-status';
+  indicator.className = 'network-status';
+  document.body.appendChild(indicator);
+  
+  function updateStatus() {
+    if (navigator.onLine) {
+      indicator.className = 'network-status online';
+      indicator.innerHTML = '<span>🟢</span><span>Онлайн</span>';
+    } else {
+      indicator.className = 'network-status offline';
+      indicator.innerHTML = '<span>🔴</span><span>Офлайн (данные сохраняются локально)</span>';
+    }
+  }
+  
+  window.addEventListener('online', updateStatus);
+  window.addEventListener('offline', updateStatus);
+  updateStatus();
 }
 
 // Управление темой
@@ -1204,6 +1526,7 @@ $("#btn-export")?.addEventListener('click', exportDatabase);
 $("#btn-import")?.addEventListener('click', importDatabase);
 
 // Запуск
+setupOnlineIndicator();
 initTheme();
 initApp();
 

@@ -1054,4 +1054,121 @@ ul li:last-child {
   color: var(--text);
 }
 
+/* ===== ИНДИКАТОР ОФЛАЙН-РЕЖИМА ===== */
+.network-status {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.network-status.online {
+  background: var(--success);
+  color: white;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.network-status.offline {
+  background: var(--danger);
+  color: white;
+  opacity: 1;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ===== ИНДИКАТОР ЗАПОЛНЕНИЯ СЕТОВ ===== */
+.exercise-progress {
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: var(--gradient-success);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ===== КНОПКА КОПИРОВАНИЯ СЕТА ===== */
+.btn-copy-set {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  margin-left: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  opacity: 0.5;
+}
+
+.btn-copy-set:hover {
+  background: var(--border-light);
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* ===== ТЕПЛОВАЯ КАРТА ТРЕНИРОВОК ===== */
+.heatmap-container {
+  margin: 20px 0;
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 4px;
+  margin-top: 12px;
+}
+
+.heatmap-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--success);
+  border-radius: 2px;
+  opacity: 0.1;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.heatmap-cell:hover {
+  transform: scale(1.2);
+  z-index: 10;
+}
+
+.heatmap-cell.active {
+  opacity: 1;
+}
+
+.heatmap-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
 
