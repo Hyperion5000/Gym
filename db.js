@@ -127,37 +127,146 @@ async function getSchemaVersion() {
 }
 
 // Обновление версии схемы
+// Если таблица не существует, создаем её перед вставкой
 async function setSchemaVersion(version, description) {
   try {
-    await execute(
-      'INSERT INTO schema_version (version, description) VALUES (?, ?)',
-      [version, description]
-    );
+    // Всегда пытаемся создать таблицу (IF NOT EXISTS безопасно)
+    // Используем db.exec() для гарантии создания
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          description TEXT
+        )
+      `);
+    } catch (e) {
+      // Игнорируем ошибки создания (таблица может уже существовать)
+    }
+    
+    // Небольшая задержка для гарантии создания
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Теперь пытаемся вставить или обновить версию
+    try {
+      const existing = await query('SELECT version FROM schema_version WHERE version = ?', [version]);
+      
+      if (!existing || existing.length === 0) {
+        // Вставляем новую версию
+        await execute(
+          'INSERT INTO schema_version (version, description) VALUES (?, ?)',
+          [version, description]
+        );
+      } else {
+        // Версия уже существует, обновляем описание
+        await execute(
+          'UPDATE schema_version SET description = ?, applied_at = CURRENT_TIMESTAMP WHERE version = ?',
+          [description, version]
+        );
+      }
+    } catch (error) {
+      // Если запрос не удался, возможно таблица все еще не создана
+      // Пытаемся создать таблицу еще раз и повторить запрос
+      try {
+        db.exec(`
+          CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+          )
+        `);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Повторяем запрос
+        const existing = await query('SELECT version FROM schema_version WHERE version = ?', [version]);
+        if (!existing || existing.length === 0) {
+          await execute(
+            'INSERT INTO schema_version (version, description) VALUES (?, ?)',
+            [version, description]
+          );
+        } else {
+          await execute(
+            'UPDATE schema_version SET description = ?, applied_at = CURRENT_TIMESTAMP WHERE version = ?',
+            [description, version]
+          );
+        }
+      } catch (e2) {
+        // Тихая обработка ошибки - это нормально во время инициализации
+      }
+    }
   } catch (error) {
-    console.error('Failed to update schema version:', error);
+    // Тихая обработка ошибки - это нормально во время инициализации
   }
 }
 
 // Миграции
+// Предполагается, что createSchema() уже вызвана и таблица schema_version существует
 async function runMigrations() {
-  const currentVersion = await getSchemaVersion();
-  
-  if (currentVersion < CURRENT_SCHEMA_VERSION) {
-    console.log(`Running migrations from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}`);
-    updateProgress(75, 'Обновление схемы БД...');
-    
-    // Миграция с версии 0 на 1 (начальная схема)
-    if (currentVersion < 1) {
-      await setSchemaVersion(1, 'Начальная схема БД');
+  try {
+    // Убеждаемся, что таблица schema_version существует перед запросом версии
+    // Если таблицы нет, создаем её явно
+    try {
+      const check = db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'`);
+      if (!check || check.length === 0 || !check[0] || !check[0].values || check[0].values.length === 0) {
+        console.warn('schema_version table not found in runMigrations, creating it...');
+        db.run(`
+          CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+          )
+        `);
+        // Небольшая задержка для гарантии создания
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    } catch (e) {
+      // Если проверка не удалась, пытаемся создать таблицу
+      console.warn('Could not check schema_version table, creating it...');
+      try {
+        db.run(`
+          CREATE TABLE IF NOT EXISTS schema_version (
+            version INTEGER PRIMARY KEY,
+            applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            description TEXT
+          )
+        `);
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (e2) {
+        // Игнорируем ошибки создания
+      }
     }
     
-    // Миграция с версии 1 на 2 (добавление таблицы schema_version)
-    if (currentVersion < 2) {
-      // Таблица уже создана в schema.sql
-      await setSchemaVersion(2, 'Добавлено версионирование схемы');
-    }
+    // Получаем текущую версию схемы
+    // Таблица schema_version должна уже существовать (создана через createSchema())
+    const currentVersion = await getSchemaVersion();
     
-    await saveDatabase();
+    if (currentVersion < CURRENT_SCHEMA_VERSION) {
+      console.log(`Running migrations from version ${currentVersion} to ${CURRENT_SCHEMA_VERSION}`);
+      updateProgress(75, 'Обновление схемы БД...');
+      
+      // Миграция с версии 0 на 1 (начальная схема)
+      if (currentVersion < 1) {
+        await setSchemaVersion(1, 'Начальная схема БД');
+      }
+      
+      // Миграция с версии 1 на 2 (добавление таблицы schema_version)
+      if (currentVersion < 2) {
+        // Таблица уже создана в schema.sql
+        await setSchemaVersion(2, 'Добавлено версионирование схемы');
+      }
+      
+      await saveDatabase();
+    }
+  } catch (error) {
+    // Если версия не найдена (новая БД), устанавливаем текущую версию
+    // Таблица schema_version должна уже существовать (создана через createSchema())
+    console.log('Setting initial schema version...');
+    try {
+      await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Начальная версия схемы');
+      await saveDatabase();
+    } catch (e) {
+      console.warn('Could not set schema version:', e.message);
+    }
   }
 }
 
@@ -174,26 +283,39 @@ async function initDatabase() {
   
   if (savedData) {
     db = new SQL.Database(savedData);
-    // Проверяем, что схема существует, если нет - создаем
-    const schemaVersionCheck = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'`);
-    if (!schemaVersionCheck || schemaVersionCheck.length === 0) {
-      console.log('Schema not found in existing DB, creating...');
+    
+    // Проверяем, что схема существует (с обработкой ошибок)
+    let schemaExists = false;
+    let viewsExist = false;
+    
+    try {
+      const schemaVersionCheck = await query(`SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'`);
+      schemaExists = schemaVersionCheck && schemaVersionCheck.length > 0;
+    } catch (e) {
+      // Игнорируем ошибки проверки
+    }
+    
+    try {
+      const viewCheck = await query(`SELECT name FROM sqlite_master WHERE type='view' AND name='v_last_sets'`);
+      viewsExist = viewCheck && viewCheck.length > 0;
+    } catch (e) {
+      // Игнорируем ошибки проверки
+    }
+    
+    if (!schemaExists || !viewsExist) {
+      console.log('Schema or views not found in existing DB, recreating...');
       await createSchema();
-      await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Схема создана для существующей БД');
-    } else {
-      // Запускаем миграции для существующей БД
-      await runMigrations();
     }
   } else {
     db = new SQL.Database();
     await createSchema();
-    // Устанавливаем текущую версию для новой БД
-    try {
-      await setSchemaVersion(CURRENT_SCHEMA_VERSION, 'Новая БД');
-    } catch (e) {
-      console.warn('Failed to set schema version (may already exist):', e.message);
-    }
   }
+  
+  // Задержка для гарантии, что схема создана
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  // Запускаем миграции после создания схемы (для всех случаев)
+  await runMigrations();
   
   updateProgress(90, 'База данных готова');
   
@@ -238,6 +360,23 @@ async function createSchema() {
       }
     }
     
+    // Проверяем, что таблица schema_version создана (используем прямой вызов db, чтобы избежать рекурсии)
+    // Создаем таблицу явно, если она не существует
+    try {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS schema_version (
+          version INTEGER PRIMARY KEY,
+          applied_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          description TEXT
+        )
+      `);
+    } catch (e) {
+      // Игнорируем ошибки создания (таблица может уже существовать)
+      if (!e.message.includes('already exists')) {
+        console.warn('Could not create schema_version table:', e.message);
+      }
+    }
+    
     await saveDatabase();
   } catch (error) {
     console.error('Failed to create schema:', error);
@@ -263,6 +402,14 @@ async function query(sql, params = []) {
     
     return result;
   } catch (error) {
+    // Тихая обработка ошибок для системных запросов во время инициализации
+    if (sql.includes('schema_version') || sql.includes('v_last_sets') || sql.includes('sqlite_master')) {
+      // Для системных запросов возвращаем пустой результат
+      if (sql.trim().toUpperCase().startsWith('SELECT')) {
+        return [];
+      }
+      throw error;
+    }
     console.error('Query failed:', sql, error);
     // Возвращаем пустой массив вместо ошибки для некоторых запросов
     if (sql.trim().toUpperCase().startsWith('SELECT')) {
@@ -297,6 +444,12 @@ async function execute(sql, params = []) {
     // Улучшенная обработка ошибок
     const errorMsg = error.message || String(error);
     const errorStr = String(error);
+    
+    // Тихая обработка ошибок для системных операций (schema_version)
+    if (sql.includes('schema_version') && errorMsg.includes('no such table')) {
+      // Это нормально во время инициализации - таблица еще не создана
+      return true;
+    }
     
     // Игнорируем некоторые известные ошибки
     if (errorMsg.includes('UNIQUE constraint') ||

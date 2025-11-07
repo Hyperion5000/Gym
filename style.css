@@ -432,7 +432,7 @@ input::placeholder {
 
 .set-row {
   display: grid;
-  grid-template-columns: 60px 1fr 1fr auto;
+  grid-template-columns: 60px 1fr 0.8fr 0.7fr;
   gap: 12px;
   padding: 12px;
   background: var(--bg);
@@ -682,29 +682,94 @@ ul li:last-child {
   justify-content: center;
 }
 
+/* Bottom Navigation - скрыта по умолчанию (десктоп) */
+.bottom-nav {
+  display: none;
+}
+
 /* ===== АДАПТИВНОСТЬ ===== */
 @media (max-width: 768px) {
+  /* Компактный хедер на мобильном */
   .bar {
-    flex-wrap: wrap;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px 12px;
+    flex-wrap: nowrap;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px 12px;
+    justify-content: space-between;
   }
   
   .title {
-    font-size: 16px;
+    font-size: 18px;
+    font-weight: 700;
   }
   
+  /* Скрываем вкладки из хедера на мобильном */
   .tabs {
-    margin-left: 0;
-    width: 100%;
-    justify-content: center;
-    margin-top: 8px;
+    display: none;
   }
   
+  /* Компактные кнопки действий */
   .actions {
-    width: 100%;
-    justify-content: center;
-    margin-top: 8px;
-    margin-left: 0;
+    margin-left: auto;
+    gap: 8px;
+  }
+  
+  .actions .btn {
+    padding: 8px 12px;
+    font-size: 20px;
+  }
+  
+  /* Скрываем текст, оставляем только иконки */
+  .actions .btn {
+    min-width: auto;
+  }
+  
+  /* Bottom Navigation - показываем на мобильном */
+  body {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+  }
+  
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 100;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .bottom-nav .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: color 0.2s ease;
+  }
+  
+  .bottom-nav .tab-icon {
+    font-size: 22px;
+  }
+  
+  .bottom-nav .tab.active {
+    color: var(--primary);
+    background: none;
+  }
+  
+  .bottom-nav .tab:hover {
+    color: var(--primary);
+    background: none;
   }
   
   .container {
@@ -1169,6 +1234,260 @@ ul li:last-child {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 8px;
+}
+
+/* ===== ДИНАМИЧЕСКИЕ СЕТЫ ===== */
+.btn-add-set {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: var(--bg);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-add-set:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-add-set:active {
+  transform: translateY(0);
+}
+
+.btn-delete-set {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  margin-left: 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  opacity: 0.4;
+}
+
+.btn-delete-set:hover {
+  background: var(--danger);
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* ===== ОТОБРАЖЕНИЕ E1RM ===== */
+.exercise-e1rm {
+  padding: 8px 12px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--primary);
+  animation: fadeIn 0.3s ease;
+}
+
+.exercise-e1rm .e1rm-max {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== АВТОМАТИЧЕСКИЙ ТМ ===== */
+.tm-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.tm-display:hover {
+  background: var(--border-light);
+}
+
+.tm-value {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.btn-edit-tm {
+  font-size: 14px;
+  padding: 2px 4px;
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.btn-edit-tm:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.tm-input.hidden {
+  display: none !important;
+}
+
+/* ===== ПРОГРЕСС-БАР БЕЗ ТЕКСТА ===== */
+.exercise-progress {
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+/* ===== КНОПКА-ИКОНКА ===== */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background: var(--border-light);
+  transform: scale(1.1);
+}
+
+/* ===== ОТОБРАЖЕНИЕ RIR ===== */
+.set-rir {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.set-rir.hidden {
+  display: none !important;
+}
+
+/* Цветовая индикация RIR */
+.set-rir.rir-perfect {
+  background: var(--success);
+  color: white;
+}
+
+.set-rir.rir-good {
+  background: var(--accent);
+  color: white;
+}
+
+.set-rir.rir-warning {
+  background: var(--danger);
+  color: white;
+}
+
+/* RIR без целевого значения (серый) */
+.set-rir:not(.rir-perfect):not(.rir-good):not(.rir-warning) {
+  background: var(--bg);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ===== НАПОМИНАНИЕ ОБ ЭКСПОРТЕ ===== */
+.export-reminder {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(150%);
+  max-width: 500px;
+  width: calc(100% - 32px);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 2px solid var(--primary);
+  z-index: 10002;
+  transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.export-reminder.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+.export-reminder-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.export-reminder-icon {
+  font-size: 48px;
+  text-align: center;
+}
+
+.export-reminder-text {
+  text-align: center;
+}
+
+.export-reminder-text strong {
+  display: block;
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--primary);
+}
+
+.export-reminder-text p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.export-reminder-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.export-reminder-actions .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
+@media (max-width: 768px) {
+  .export-reminder {
+    bottom: 10px;
+    width: calc(100% - 20px);
+  }
+  
+  .export-reminder-content {
+    padding: 16px;
+  }
+  
+  .export-reminder-actions {
+    flex-direction: column;
+  }
+  
+  .export-reminder-actions .btn {
+    width: 100%;
+  }
 }
 
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meso-cache-v3';
+const CACHE_NAME = 'meso-cache-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -8,9 +8,7 @@ const ASSETS = [
   './schema.sql',
   './plan.csv',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './apple-touch-icon.png'
+  './icon.svg'
 ];
 
 self.addEventListener('install', (e) => {

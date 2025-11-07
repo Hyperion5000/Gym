@@ -4,11 +4,14 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
   <title>MESO • Тренировки</title>
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#10b981">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="format-detection" content="telephone=no">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -68,8 +71,13 @@
 
       <div id="exercises-list" class="exercises-list"></div>
 
-      <div class="save-section">
+      <!-- Автосохранение активно - кнопка не нужна -->
+      <div class="save-section" style="display: none;">
         <button id="btn-save" class="btn primary">💾 Сохранить в БД</button>
+      </div>
+      
+      <div class="card small" style="background: var(--bg); border-left: 3px solid var(--primary);">
+        <b>ℹ️ Автосохранение включено:</b> данные сохраняются автоматически при заполнении сетов.
       </div>
 
       <div class="card small">
@@ -248,6 +256,30 @@
     </section>
   </main>
 
+  <!-- Bottom Navigation для мобильных -->
+  <nav class="bottom-nav">
+    <button data-tab="train" class="tab active">
+      <span class="tab-icon">🏋️</span>
+      <span>Тренировка</span>
+    </button>
+    <button data-tab="history" class="tab">
+      <span class="tab-icon">📜</span>
+      <span>История</span>
+    </button>
+    <button data-tab="dash" class="tab">
+      <span class="tab-icon">📊</span>
+      <span>Дашборд</span>
+    </button>
+    <button data-tab="prs" class="tab">
+      <span class="tab-icon">🏆</span>
+      <span>Рекорды</span>
+    </button>
+    <button data-tab="faq" class="tab">
+      <span class="tab-icon">❓</span>
+      <span>FAQ</span>
+    </button>
+  </nav>
+
   <footer class="safe"></footer>
 
   <input type="file" id="file-import" accept=".json" style="display: none;">
@@ -293,14 +325,28 @@
         });
       }
       
-      // Обработчики вкладок
+      // Обработчики вкладок (работает как для десктоп, так и для bottom nav)
       document.addEventListener('click', (e) => {
         const t = e.target.closest('.tab');
-        if (!t) return;
-        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        if (!t || !t.dataset.tab) return;
+        
+        // Обновляем все вкладки (и в хедере, и в bottom nav)
+        document.querySelectorAll('.tab').forEach(tab => {
+          if (tab.dataset.tab === t.dataset.tab) {
+            tab.classList.add('active');
+          } else {
+            tab.classList.remove('active');
+          }
+        });
+        
+        // Переключаем страницы
         document.querySelectorAll('.tabpage').forEach(x=>x.classList.remove('active'));
-        t.classList.add('active');
         document.getElementById(t.dataset.tab).classList.add('active');
+        
+        // Прокручиваем вверх на мобильном
+        if (window.innerWidth <= 768) {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
       });
       
       // Загружаем модуль app.js после загрузки SQL.js
