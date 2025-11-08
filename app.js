@@ -1303,7 +1303,7 @@ async function displayProgression() {
   // Добавляем кнопку "Применить прогноз"
   const applyBtn = document.createElement('button');
   applyBtn.className = 'btn primary';
-  applyBtn.textContent = 'Применить прогноз к неделе ' + data[0]?.nextWeek;
+  applyBtn.textContent = 'Применить прогноз к неделе ' + (data[0] && data[0].nextWeek ? data[0].nextWeek : '');
   applyBtn.style.marginTop = '12px';
   applyBtn.addEventListener('click', () => applyProgression(data));
   container.appendChild(applyBtn);
@@ -1317,7 +1317,7 @@ async function displayProgression() {
 
 // Применить прогноз к неделе
 async function applyProgression(progressionData) {
-  const nextWeek = progressionData[0]?.nextWeek;
+  const nextWeek = (progressionData[0] && progressionData[0].nextWeek) ? progressionData[0].nextWeek : null;
   if (!nextWeek) return;
   
   // Сохраняем прогноз в localStorage
@@ -1337,7 +1337,7 @@ async function loadLastTM(exercise) {
       'SELECT tm_kg FROM tm WHERE exercise = ?',
       [exercise]
     );
-    return row?.tm_kg || null;
+    return (row && row.tm_kg) ? row.tm_kg : null;
   } catch (error) {
     console.warn('Failed to load TM:', error);
     return null;
@@ -1437,7 +1437,8 @@ async function autoSaveCompletedSets() {
         console.log(`Auto-saved ${newRows.length} sets`);
         
         // ОПТИМИЗАЦИЯ: Загружаем все TM одним запросом
-        const week = Number((DOM.week || $("#week"))?.value || 1);
+        const weekEl = DOM.week || $("#week");
+        const week = Number((weekEl && weekEl.value) ? weekEl.value : 1);
         const exerciseArray = Array.from(exercisesToUpdateTM);
         
         if (exerciseArray.length > 0) {
@@ -1543,8 +1544,10 @@ function saveDraft() {
       
       const setRows = card.querySelectorAll('.set-row:not(.set-header)');
       setRows.forEach((row, idx) => {
-        const w = row.querySelector('input.w')?.value || '';
-        const r = row.querySelector('input.r')?.value || '';
+        const wInput = row.querySelector('input.w');
+        const rInput = row.querySelector('input.r');
+        const w = (wInput && wInput.value) ? wInput.value : '';
+        const r = (rInput && rInput.value) ? rInput.value : '';
         if (w || r) {
           sets.push({ set: idx + 1, weight: w, reps: r });
         }
@@ -1593,7 +1596,7 @@ function restoreDraft() {
         // Добавляем недостающие сеты
         const addSetBtn = card.querySelector('.btn-add-set');
         for (let i = currentSetCount; i < targetSetCount; i++) {
-          addSetBtn?.click();
+          if (addSetBtn) addSetBtn.click();
         }
         
         // Заполняем данные сетов
@@ -1737,7 +1740,8 @@ function initGlobalHandlers() {
       
       const tmBadge = card.querySelector('.tm-badge');
       if (tmBadge) {
-        const tmValue = card.querySelector('.tm-value')?.textContent || '';
+        const tmValueEl = card.querySelector('.tm-value');
+        const tmValue = (tmValueEl && tmValueEl.textContent) ? tmValueEl.textContent : '';
         tmBadge.innerHTML = `TM ${tmValue} кг${newLocked ? ' 🔒' : ' <span style="font-size: 0.7em; opacity: 0.7;">Auto</span>'}`;
         tmBadge.title = `Тренировочный максимум${newLocked ? ' (зафиксирован)' : ' (авто)'}`;
       }
@@ -1775,7 +1779,8 @@ function initGlobalHandlers() {
       const card = document.querySelector(`.exercise-card[data-exercise="${exerciseName}"]`);
       if (!card) return;
       
-      const recommendationText = btn.previousElementSibling?.textContent;
+      const prevSibling = btn.previousElementSibling;
+      const recommendationText = (prevSibling && prevSibling.textContent) ? prevSibling.textContent : '';
       const match = /(\d+(?:\.\d+)?)\s*кг\s*×\s*(\d+)/.exec(recommendationText);
       if (match) {
         const weight = parseFloat(match[1]);
@@ -1829,13 +1834,15 @@ function initGlobalHandlers() {
     if (inp.classList.contains('r')) {
       const reps = Number(normalizeNumber(inp.value || 0));
       const setRow = inp.closest('.set-row');
-      const weightInput = setRow?.querySelector('input.w');
+      const weightInput = setRow ? setRow.querySelector('input.w') : null;
       const tm = Number(card.dataset.tm || 0);
       const targetRIR = card.dataset.target || '';
       
       // Если повторы введены, вес пустой или 0, ТМ задан и есть целевой RIR
       if (reps > 0 && weightInput && (!weightInput.value || Number(weightInput.value) === 0) && tm > 0 && targetRIR) {
-        const calculatedWeight = weightFromRIR(tm, targetRIR, reps, card.className.match(/type([ABCD])/)?.[1] || 'A');
+        const typeMatch = card.className.match(/type([ABCD])/);
+        const exerciseType = (typeMatch && typeMatch[1]) ? typeMatch[1] : 'A';
+        const calculatedWeight = weightFromRIR(tm, targetRIR, reps, exerciseType);
         if (calculatedWeight && calculatedWeight > 0) {
           weightInput.value = calculatedWeight;
           // Тихое уведомление (не навязчивое)
@@ -1849,7 +1856,7 @@ function initGlobalHandlers() {
     if (inp.classList.contains('w')) {
       const weight = Number(normalizeNumber(inp.value || 0));
       const setRow = inp.closest('.set-row');
-      const repsInput = setRow?.querySelector('input.r');
+      const repsInput = setRow ? setRow.querySelector('input.r') : null;
       const tm = Number(card.dataset.tm || 0);
       const targetRIR = card.dataset.target || '';
       
@@ -1878,8 +1885,8 @@ function initGlobalHandlers() {
       if (setRow && setRow.dataset.set === '1') {
         const firstWeightInput = setRow.querySelector('input.w');
         const firstRepsInput = setRow.querySelector('input.r');
-        const firstWeight = Number(normalizeNumber(firstWeightInput?.value || 0));
-        const firstReps = Number(normalizeNumber(firstRepsInput?.value || 0));
+        const firstWeight = Number(normalizeNumber((firstWeightInput && firstWeightInput.value) ? firstWeightInput.value : 0));
+        const firstReps = Number(normalizeNumber((firstRepsInput && firstRepsInput.value) ? firstRepsInput.value : 0));
         
         // Если первый сет полностью заполнен (вес > 0 и повторы > 0)
         if (firstWeight > 0 && firstReps > 0) {
@@ -1891,8 +1898,8 @@ function initGlobalHandlers() {
             const row = allSetRows[i];
             const wInput = row.querySelector('input.w');
             const rInput = row.querySelector('input.r');
-            const w = Number(normalizeNumber(wInput?.value || 0));
-            const r = Number(normalizeNumber(rInput?.value || 0));
+            const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
+            const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
             
             if ((!w || w === 0) || (!r || r === 0)) {
               hasEmptySets = true;
@@ -1976,7 +1983,8 @@ function initGlobalHandlers() {
     if (!card) return;
     
     const setRow = inp.closest('.set-row');
-    const w = Number(normalizeNumber(setRow?.querySelector('input.w')?.value || 0));
+    const wInput = setRow ? setRow.querySelector('input.w') : null;
+    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
     const r = Number(normalizeNumber(inp.value || 0));
     
     // Если оба поля заполнены, переходим к следующему сету
@@ -2070,7 +2078,7 @@ function initGlobalHandlers() {
           const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(ex.setrep);
           const targetReps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
           const card = inp.closest('.exercise-card');
-          const targetRIR = card?.dataset.target || '';
+          const targetRIR = (card && card.dataset.target) ? card.dataset.target : '';
           const recommendedWeight = getRecommendedWeight(value, week, targetReps, 'A', targetRIR);
           
           const recommendationBox = card.querySelector('.recommendation-box');
@@ -2114,8 +2122,10 @@ function updateSetProgress(card) {
   const totalSets = setRows.length;
   
   setRows.forEach(row => {
-    const w = row.querySelector('input.w')?.value.trim();
-    const r = row.querySelector('input.r')?.value.trim();
+    const wInput = row.querySelector('input.w');
+    const rInput = row.querySelector('input.r');
+    const w = (wInput && wInput.value) ? wInput.value.trim() : '';
+    const r = (rInput && rInput.value) ? rInput.value.trim() : '';
     if (w && r) filledSets++;
   });
   
@@ -2169,8 +2179,8 @@ function computeCard(card) {
   }));
   
   setData.forEach(({ row, wInput, rInput, rirCell, idx }) => {
-    const w = Number(normalizeNumber(wInput?.value || 0));
-    const r = Number(normalizeNumber(rInput?.value || 0));
+    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
+    const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
     
     if (w >= 0 && r > 0) { // Разрешаем вес = 0 для подтягиваний
       const e1 = e1rm(w, r);
@@ -2318,7 +2328,7 @@ async function loadHints() {
       
       if (h) {
         hintContainer.innerHTML = `
-          <span class="hint-text">Прошлый: ${h.weight}кг×${h.reps} (e1RM: ${h.e1rm ?? '—'}кг)</span>
+          <span class="hint-text">Прошлый: ${h.weight}кг×${h.reps} (e1RM: ${(h.e1rm != null) ? h.e1rm : '—'}кг)</span>
           <button class="btn-icon" data-act="fill-last" data-ex="${ex.name}" title="Заполнить прошлыми значениями">📝</button>
         `;
         hintContainer.style.display = 'flex';
@@ -2380,7 +2390,7 @@ async function suggestForExercise(exName) {
   
   const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(item.setrep);
   const target_reps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
-  const target_rir = targetToNumber(item.target[week]) ?? 2;
+  const target_rir = targetToNumber(item.target[week]) || 2;
   
   try {
     // Получаем последние 3-5 тренировок для более точной рекомендации
@@ -2474,8 +2484,10 @@ function collectRows() {
     const target_rir = ex ? ex.target[week] : '';
     
     setRows.forEach((row, idx) => {
-      const w = normalizeNumber(row.querySelector('input.w')?.value);
-      const r = normalizeNumber(row.querySelector('input.r')?.value);
+      const wInput = row.querySelector('input.w');
+      const rInput = row.querySelector('input.r');
+      const w = normalizeNumber((wInput && wInput.value) ? wInput.value : '');
+      const r = normalizeNumber((rInput && rInput.value) ? rInput.value : '');
       
       // Разрешаем вес = 0 для подтягиваний, но r должно быть > 0
       if ((w !== '' && w !== null) && r) {
@@ -2551,7 +2563,8 @@ async function saveToDB() {
     }
     
     // ОПТИМИЗАЦИЯ: Загружаем все TM одним запросом
-    const week = Number((DOM.week || $("#week"))?.value || 1);
+    const weekEl = DOM.week || $("#week");
+    const week = Number((weekEl && weekEl.value) ? weekEl.value : 1);
     const exerciseArray = Array.from(exercisesToUpdateTM);
     
     if (exerciseArray.length > 0) {
@@ -2661,12 +2674,12 @@ async function ensureSession() {
       [date, day]
     );
     
-    const statusText = `Тренировка: ${day} • Сеты: ${stats?.sets || 0} • Тоннаж: ${Math.round(stats?.tonnage || 0)} кг`;
+    const statusText = `Тренировка: ${day} • Сеты: ${(stats && stats.sets) ? stats.sets : 0} • Тоннаж: ${Math.round((stats && stats.tonnage) ? stats.tonnage : 0)} кг`;
     (DOM.sessionStatus || $("#session-status")).textContent = statusText;
     
     // Показываем/скрываем кнопку завершения
     const finishBtn = DOM.btnFinish || $("#btn-finish");
-    if (stats?.sets > 0) {
+    if (stats && stats.sets > 0) {
       finishBtn.style.display = 'inline-flex';
     } else {
       finishBtn.style.display = 'none';
@@ -2691,8 +2704,10 @@ async function checkAutoFinishSession() {
     let filledSets = 0;
     for (let i = 0; i < Math.min(setRows.length, targetSetCount); i++) {
       const row = setRows[i];
-      const w = Number(normalizeNumber(row.querySelector('input.w')?.value || 0));
-      const r = Number(normalizeNumber(row.querySelector('input.r')?.value || 0));
+      const wInput = row.querySelector('input.w');
+      const rInput = row.querySelector('input.r');
+      const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
+      const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
       if (w >= 0 && r > 0) {
         filledSets++;
       }
@@ -2741,10 +2756,10 @@ async function finishSession() {
     
     await dbModule.execute(
       'UPDATE sessions SET status = ?, note = ? WHERE id = ?',
-      ['done', `Завершено: ${stats?.sets || 0} сетов, ${Math.round(stats?.tonnage || 0)} кг`, CURRENT_SESSION.id]
+      ['done', `Завершено: ${(stats && stats.sets) ? stats.sets : 0} сетов, ${Math.round((stats && stats.tonnage) ? stats.tonnage : 0)} кг`, CURRENT_SESSION.id]
     );
     
-    showNotification(`Тренировка завершена! ${stats?.sets || 0} сетов, ${Math.round(stats?.tonnage || 0)} кг тоннажа`, 'success');
+    showNotification(`Тренировка завершена! ${(stats && stats.sets) ? stats.sets : 0} сетов, ${Math.round((stats && stats.tonnage) ? stats.tonnage : 0)} кг тоннажа`, 'success');
     (DOM.sessionStatus || $("#session-status")).textContent = 'Тренировка завершена ✓';
     (DOM.btnFinish || $("#btn-finish")).style.display = 'none';
     CURRENT_SESSION = null;
@@ -2808,7 +2823,7 @@ async function renderHeatmap() {
       cell.className = 'heatmap-cell';
       if (intensity > 0) cell.classList.add('active');
       cell.style.opacity = intensity || 0.1;
-      cell.title = `${dateStr}: ${dayData?.sets_count || 0} сетов, ${dayData?.exercises_count || 0} упражнений`;
+      cell.title = `${dateStr}: ${(dayData && dayData.sets_count) ? dayData.sets_count : 0} сетов, ${(dayData && dayData.exercises_count) ? dayData.exercises_count : 0} упражнений`;
       heatmap.appendChild(cell);
     }
     
@@ -2834,17 +2849,17 @@ async function loadDashboard() {
       [week]
     );
     
-    $("#m-tonnage").textContent = vol?.tonnage ?? '—';
-    $("#m-reps").textContent = vol?.reps ?? '—';
-    $("#m-sets").textContent = vol?.sets ?? '—';
-    $("#m-rir").textContent = vol?.avg_rir_diff ?
+    $("#m-tonnage").textContent = (vol && vol.tonnage != null) ? vol.tonnage : '—';
+    $("#m-reps").textContent = (vol && vol.reps != null) ? vol.reps : '—';
+    $("#m-sets").textContent = (vol && vol.sets != null) ? vol.sets : '—';
+    $("#m-rir").textContent = (vol && vol.avg_rir_diff != null) ?
       (Math.round(vol.avg_rir_diff * 10) / 10) : '—';
     
     const byType = [
-      ['A', vol?.a_sets ?? 0],
-      ['B', vol?.b_sets ?? 0],
-      ['C', vol?.c_sets ?? 0],
-      ['D', vol?.d_sets ?? 0]
+      ['A', (vol && vol.a_sets != null) ? vol.a_sets : 0],
+      ['B', (vol && vol.b_sets != null) ? vol.b_sets : 0],
+      ['C', (vol && vol.c_sets != null) ? vol.c_sets : 0],
+      ['D', (vol && vol.d_sets != null) ? vol.d_sets : 0]
     ];
     
     const ul = $("#by-type");
@@ -3173,7 +3188,7 @@ async function editSet(id) {
     
     // RIR считается от TM, а не от e1RM
     const tmRow = await dbModule.getOne('SELECT tm_kg FROM tm WHERE exercise = ?', [set.exercise]);
-    const tm = tmRow?.tm_kg ?? null;
+    const tm = (tmRow && tmRow.tm_kg != null) ? tmRow.tm_kg : null;
     const rir = (set.target_rir && tm) ? estRIR(tm, weight, reps) : null;
     const rpe = rpeFromRir(rir);
     
@@ -3183,7 +3198,8 @@ async function editSet(id) {
     );
     
     // Обновляем TM если это упражнение типа A
-    const week = Number((DOM.week || $("#week"))?.value || 1);
+    const weekEl = DOM.week || $("#week");
+    const week = Number((weekEl && weekEl.value) ? weekEl.value : 1);
     // Сначала пробуем посев TM, если его нет
     const existingTM = await dbModule.getOne('SELECT tm_kg FROM tm WHERE exercise = ?', [set.exercise]);
     if (!existingTM || !existingTM.tm_kg) {
@@ -3199,7 +3215,7 @@ async function editSet(id) {
     if (card) {
       // Обновляем TM в карточке
       const tmRow = await dbModule.getOne('SELECT tm_kg FROM tm WHERE exercise = ?', [set.exercise]);
-      if (tmRow?.tm_kg) {
+      if (tmRow && tmRow.tm_kg) {
         card.dataset.tm = tmRow.tm_kg;
         const tmValue = card.querySelector('.tm-value');
         if (tmValue) {
@@ -3212,7 +3228,7 @@ async function editSet(id) {
                WHERE exercise = ? AND date >= date('now', '-28 days') AND e1rm > 0`,
               [set.exercise]
             );
-            const bestE1RMValue = bestE1RM?.best_e1rm || e1;
+            const bestE1RMValue = (bestE1RM && bestE1RM.best_e1rm) ? bestE1RM.best_e1rm : e1;
             tmDisplay.title = `Тренировочный максимум (90% от лучшего e1RM за 4 недели: ${bestE1RMValue} кг) - авто`;
           }
         }
@@ -3242,7 +3258,8 @@ function initHistoryFilters() {
   });
   
   // Обработчик кнопки загрузки
-  $("#btn-load-history")?.addEventListener('click', loadHistory);
+  const loadHistoryBtn = $("#btn-load-history");
+  if (loadHistoryBtn) loadHistoryBtn.addEventListener('click', loadHistory);
 }
 
 // Экспорт/импорт
@@ -3257,7 +3274,7 @@ async function exportDatabase() {
     
     // Улучшенное название файла с информацией о содержимом
     const stats = await dbModule.query('SELECT COUNT(DISTINCT date) as workouts FROM tracker');
-    const workoutCount = stats[0]?.workouts || 0;
+    const workoutCount = (stats[0] && stats[0].workouts) ? stats[0].workouts : 0;
     const dateStr = new Date().toISOString().slice(0, 10);
     
     const blob = new Blob([json], { type: 'application/json' });
@@ -3327,7 +3344,7 @@ async function importDatabase() {
       
       // Проверяем наличие данных
       const hasData = await dbModule.query('SELECT COUNT(*) as count FROM tracker');
-      const existingCount = hasData[0]?.count || 0;
+      const existingCount = (hasData[0] && hasData[0].count) ? hasData[0].count : 0;
       
       if (existingCount > 0) {
         // Предлагаем режим слияния
@@ -3485,7 +3502,8 @@ async function showOnboarding() {
   // Скрываем основной интерфейс
   document.querySelector('main').style.display = 'none';
   document.querySelector('header').style.display = 'none';
-  document.querySelector('.bottom-nav')?.style.setProperty('display', 'none');
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (bottomNav) bottomNav.style.setProperty('display', 'none');
   
   // Создаем экран онбординга
   const onboarding = document.createElement('div');
@@ -3611,10 +3629,12 @@ async function saveOnboardingWeights() {
   }
   
   // Удаляем онбординг и показываем основной интерфейс
-  document.querySelector('.onboarding-screen')?.remove();
+  const onboardingScreen = document.querySelector('.onboarding-screen');
+  if (onboardingScreen) onboardingScreen.remove();
   document.querySelector('main').style.display = '';
   document.querySelector('header').style.display = '';
-  document.querySelector('.bottom-nav')?.style.removeProperty('display');
+  const bottomNav = document.querySelector('.bottom-nav');
+  if (bottomNav) bottomNav.style.removeProperty('display');
   
   // Инициализируем интерфейс после онбординга
   initGlobalHandlers();
@@ -3785,7 +3805,8 @@ function initTheme() {
   applyTheme(theme);
   
   // Обработчик переключения темы
-  $("#btn-theme")?.addEventListener('click', toggleTheme);
+  const themeBtn = $("#btn-theme");
+  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
   
   // Слушаем изменения системной темы
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
@@ -3830,8 +3851,10 @@ function generateWarmupSets(exName) {
   let topReps = 0;
   
   setRows.forEach(row => {
-    const w = Number(normalizeNumber(row.querySelector('input.w')?.value || 0));
-    const r = Number(normalizeNumber(row.querySelector('input.r')?.value || 0));
+    const wInput = row.querySelector('input.w');
+    const rInput = row.querySelector('input.r');
+    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
+    const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
     if (w > topWeight) {
       topWeight = w;
       topReps = r;
@@ -3892,9 +3915,12 @@ function generateBackoffSets(exName) {
   let topRIR = null;
   
   setRows.forEach(row => {
-    const w = Number(normalizeNumber(row.querySelector('input.w')?.value || 0));
-    const r = Number(normalizeNumber(row.querySelector('input.r')?.value || 0));
-    const rirText = row.querySelector('.set-rir')?.textContent;
+    const wInput = row.querySelector('input.w');
+    const rInput = row.querySelector('input.r');
+    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
+    const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
+    const rirEl = row.querySelector('.set-rir');
+    const rirText = (rirEl && rirEl.textContent) ? rirEl.textContent : '';
     if (w > topWeight) {
       topWeight = w;
       topReps = r;
@@ -3951,8 +3977,10 @@ async function applyAllHints() {
     
     // Проверяем, есть ли уже заполненные сеты
     const hasFilledSets = Array.from(card.querySelectorAll('.set-row:not(.set-header)')).some(row => {
-      const w = row.querySelector('input.w')?.value;
-      const r = row.querySelector('input.r')?.value;
+      const wInput = row.querySelector('input.w');
+      const rInput = row.querySelector('input.r');
+      const w = (wInput && wInput.value) ? wInput.value : '';
+      const r = (rInput && rInput.value) ? rInput.value : '';
       return w && r && Number(w) > 0 && Number(r) > 0;
     });
     
@@ -3980,11 +4008,16 @@ async function applyAllHints() {
 }
 
 // Обработчики событий
-$("#btn-save")?.addEventListener('click', saveToDB);
-$("#btn-finish")?.addEventListener('click', finishSession);
-$("#btn-export")?.addEventListener('click', exportDatabase);
-$("#btn-import")?.addEventListener('click', importDatabase);
-$("#btn-apply-hints")?.addEventListener('click', applyAllHints);
+const saveBtn = $("#btn-save");
+if (saveBtn) saveBtn.addEventListener('click', saveToDB);
+const finishBtn = $("#btn-finish");
+if (finishBtn) finishBtn.addEventListener('click', finishSession);
+const exportBtn = $("#btn-export");
+if (exportBtn) exportBtn.addEventListener('click', exportDatabase);
+const importBtn = $("#btn-import");
+if (importBtn) importBtn.addEventListener('click', importDatabase);
+const applyHintsBtn = $("#btn-apply-hints");
+if (applyHintsBtn) applyHintsBtn.addEventListener('click', applyAllHints);
 
 // Система напоминаний об экспорте
 function checkExportReminder() {
