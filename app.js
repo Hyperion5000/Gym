@@ -324,6 +324,118 @@ async function getAutoTM(exercise) {
   }
 }
 
+// Получение коэффициента недели
+function getWeekCoefficient(week) {
+  const weekCoefficients = {
+    1: 0.85, // 85% от ТМ (RIR 3-4)
+    2: 0.90, // 90% от ТМ (RIR 2-3)
+    3: 0.95, // 95% от ТМ (RIR 1-2)
+    4: 0.70  // 70% от ТМ (RIR 4-5, deload)
+  };
+  return weekCoefficients[week] || 0.85;
+}
+
+// Расчет рекомендованного веса
+function getRecommendedWeight(tm, week, reps) {
+  if (!tm || tm <= 0) return null;
+  const coefficient = getWeekCoefficient(week);
+  const baseWeight = tm * coefficient;
+  // Округление до 2.5 кг
+  return Math.round(baseWeight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+}
+
+// Переключение раскрытия деталей упражнения
+function toggleExerciseDetails(exerciseName) {
+  const card = document.querySelector(`.exercise-card[data-exercise="${exerciseName}"]`);
+  if (!card) return;
+  
+  const detailsPanel = card.querySelector('.exercise-details-panel');
+  if (!detailsPanel) return;
+  
+  const isVisible = detailsPanel.style.display !== 'none';
+  detailsPanel.style.display = isVisible ? 'none' : 'block';
+  
+  // Обновляем иконку кнопки
+  const toggleBtn = card.querySelector('.btn-toggle-details');
+  if (toggleBtn) {
+    toggleBtn.textContent = isVisible ? 'ℹ️' : '▼';
+  }
+}
+
+// Обновление ТМ после завершения недели 3
+async function updateTMAfterCycle() {
+  const currentWeek = Number((DOM.week || $("#week")).value);
+  // Только для недели 3
+  if (currentWeek !== 3) return;
+  
+  try {
+    // Получить все упражнения из плана
+    const allExercises = [];
+    for (const day of Object.keys(PLAN)) {
+      for (const ex of PLAN[day]) {
+        if (!allExercises.find(e => e.name === ex.name)) {
+          allExercises.push(ex.name);
+        }
+      }
+    }
+    
+    let updatedCount = 0;
+    
+    for (const exercise of allExercises) {
+      // Лучший e1RM ТОЛЬКО из недели 3 за последние 7 дней
+      const best = await dbModule.getOne(
+        `SELECT MAX(e1rm) as best_e1rm 
+         FROM tracker 
+         WHERE exercise = ? AND week = 3 AND date >= date('now', '-7 days')`,
+        [exercise]
+      );
+      
+      if (best && best.best_e1rm > 0) {
+        // Новый ТМ = 90% от лучшего e1RM недели 3
+        const newTM = Math.round(best.best_e1rm * 0.9 * 10) / 10;
+        
+        await dbModule.execute(
+          `UPDATE tm
+           SET tm_kg = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE exercise = ?`,
+          [newTM, exercise]
+        );
+        
+        console.log(`${exercise}: ТМ обновлен ${newTM} кг`);
+        updatedCount++;
+      }
+    }
+    
+    if (updatedCount > 0) {
+      // Показать уведомление
+      showNotification(
+        "🎉 Цикл завершен! Базовые веса обновлены для следующего цикла.",
+        "success"
+      );
+    }
+  } catch (error) {
+    console.error('Failed to update TM after cycle:', error);
+  }
+}
+
+// Сброс цикла (очистка всех ТМ)
+async function resetCycle() {
+  if (!confirm('Вы уверены, что хотите сбросить все базовые веса? Это действие нельзя отменить.')) {
+    return;
+  }
+  
+  try {
+    await dbModule.execute('DELETE FROM tm');
+    showNotification('Все базовые веса сброшены. Запустите онбординг заново.', 'success');
+    
+    // Перезагружаем упражнения
+    await buildExercises();
+  } catch (error) {
+    console.error('Failed to reset cycle:', error);
+    showNotification('Ошибка при сбросе цикла', 'error');
+  }
+}
+
 // Автоматическое обновление ТМ после сохранения сета (для первой недели)
 async function updateTMFromSet(exercise, e1rm) {
   if (!exercise || !e1rm || e1rm <= 0) return;
@@ -432,23 +544,62 @@ async function buildExercises() {
     card.dataset.target = ex.target[week] || '';
     card.dataset.tm = tm || 0;
     
+    // Рассчитываем рекомендацию
+    const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(ex.setrep);
+    const targetReps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
+    const recommendedWeight = tm > 0 ? getRecommendedWeight(tm, Number(week), targetReps) : null;
+    
+    // Получаем последний результат для истории
+    const lastResult = lastSet ? `${lastSet.weight} кг × ${lastSet.reps}` : 'Нет данных';
+    
     card.innerHTML = `
       <div class="exercise-header">
         <span class="exercise-number">${idx + 1}</span>
         <div class="exercise-title-block">
           <h3 class="exercise-name">${ex.name}</h3>
-          <div class="exercise-hint" data-exercise="${ex.name}"></div>
         </div>
         <span class="exercise-type type${ex.type}">${ex.type}</span>
       </div>
-      <div class="exercise-info">
-        <span>Сеты: ${ex.setrep}</span>
-        <span>Цел. RIR: ${ex.target[week] || ''}</span>
-        <span class="tm-display" title="Тренировочный максимум (90% от 1RM)${tm ? ' - авто' : ''}" style="cursor: pointer;">
-          ТМ: <span class="tm-value">${tm || 'не задан'}</span>
-          <button class="btn-icon btn-edit-tm" title="Настроить ТМ">⚙️</button>
-        </span>
-        <input class="tm-input hidden" type="text" inputmode="decimal" placeholder="0" value="${tm || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;">
+      <div class="recommendation-box">
+        ${recommendedWeight ? `
+          <div class="recommendation-text">
+            ✨ Рекомендуем: <strong>${recommendedWeight} кг × ${targetReps}</strong>
+          </div>
+          <button class="btn btn-use-recommendation" data-exercise="${ex.name}" title="Использовать рекомендацию">
+            Использовать рекомендацию
+          </button>
+        ` : `
+          <div class="recommendation-text" style="color: var(--text-muted);">
+            Укажите базовый вес для получения рекомендаций
+          </div>
+        `}
+        <button class="btn-icon btn-toggle-details" data-exercise="${ex.name}" title="Показать детали">ℹ️</button>
+      </div>
+      <div class="exercise-details-panel" style="display: none;">
+        <div class="exercise-details-content">
+          <div class="detail-item">
+            <span class="detail-label">Прошлый результат:</span>
+            <span class="detail-value">${lastResult}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Целевой максимум:</span>
+            <span class="detail-value">
+              <span class="tm-display">
+                <span class="tm-value">${tm || 'не задан'}</span> кг
+                <button class="btn-icon btn-edit-tm" title="Настроить ТМ">⚙️</button>
+              </span>
+              <input class="tm-input hidden" type="text" inputmode="decimal" placeholder="0" value="${tm || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;">
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Целевой RIR:</span>
+            <span class="detail-value">${ex.target[week] || '—'}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Сеты:</span>
+            <span class="detail-value">${ex.setrep}</span>
+          </div>
+        </div>
       </div>
       <div class="exercise-progress">
         <div class="progress-bar" style="width: 0%"></div>
@@ -671,6 +822,16 @@ async function autoSaveCompletedSets() {
         
         // Тихое уведомление (без шумного оповещения)
         showNotification(`✓ Автосохранено: ${newRows.length} сетов`, 'success');
+        
+        // Проверяем завершение недели 3 и обновляем ТМ (только если все сеты заполнены)
+        const currentWeek = Number((DOM.week || $("#week")).value);
+        if (currentWeek === 3) {
+          // Проверяем, все ли сеты заполнены для текущей тренировки
+          const allRows = collectRows();
+          if (allRows.length > 0) {
+            await updateTMAfterCycle();
+          }
+        }
       }
     }
   } catch (error) {
@@ -887,6 +1048,41 @@ function initGlobalHandlers() {
       tmInput.focus();
       tmInput.select();
     }
+    
+    // Обработчик переключения деталей
+    if (e.target.classList.contains('btn-toggle-details') || e.target.closest('.btn-toggle-details')) {
+      const btn = e.target.closest('.btn-toggle-details');
+      const exerciseName = btn.dataset.exercise;
+      toggleExerciseDetails(exerciseName);
+    }
+    
+    // Обработчик "Использовать рекомендацию"
+    if (e.target.classList.contains('btn-use-recommendation') || e.target.closest('.btn-use-recommendation')) {
+      const btn = e.target.closest('.btn-use-recommendation');
+      const exerciseName = btn.dataset.exercise;
+      const card = document.querySelector(`.exercise-card[data-exercise="${exerciseName}"]`);
+      if (!card) return;
+      
+      const recommendationText = btn.previousElementSibling?.textContent;
+      const match = /(\d+(?:\.\d+)?)\s*кг\s*×\s*(\d+)/.exec(recommendationText);
+      if (match) {
+        const weight = parseFloat(match[1]);
+        const reps = parseInt(match[2]);
+        
+        // Заполняем первый сет
+        const firstSetRow = card.querySelector('.set-row[data-set="1"]');
+        if (firstSetRow) {
+          const weightInput = firstSetRow.querySelector('input.w');
+          const repsInput = firstSetRow.querySelector('input.r');
+          if (weightInput) weightInput.value = weight;
+          if (repsInput) repsInput.value = reps;
+          
+          // Пересчитываем карточку
+          computeCard(card);
+          showNotification(`Рекомендация применена: ${weight} кг × ${reps}`, 'success');
+        }
+      }
+    }
   });
   
   // Единый обработчик для всех input событий
@@ -990,7 +1186,7 @@ function initGlobalHandlers() {
       const tmDisplay = card.querySelector('.tm-display');
       const tmValue = card.querySelector('.tm-value');
       
-      if (value > 0) {
+      if (value > 0 && value <= LIMITS.MAX_TM) {
         const validation = validateTM(value);
         if (!validation.valid) {
           inp.classList.add('input-error');
@@ -1003,6 +1199,23 @@ function initGlobalHandlers() {
         
         // Используем debounced версию (убираем прямой вызов saveTM)
         debouncedSaveTM(exName, value);
+        
+        // Обновляем рекомендацию после изменения ТМ
+        const week = Number((DOM.week || $("#week")).value);
+        const ex = Object.values(PLAN).flat().find(e => e.name === exName);
+        if (ex) {
+          const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(ex.setrep);
+          const targetReps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
+          const recommendedWeight = getRecommendedWeight(value, week, targetReps);
+          
+          const recommendationBox = card.querySelector('.recommendation-box');
+          if (recommendationBox && recommendedWeight) {
+            const recommendationText = recommendationBox.querySelector('.recommendation-text');
+            if (recommendationText) {
+              recommendationText.innerHTML = `✨ Рекомендуем: <strong>${recommendedWeight} кг × ${targetReps}</strong>`;
+            }
+          }
+        }
       }
       
       inp.classList.add('hidden');
@@ -1466,6 +1679,9 @@ async function finishSession() {
     (DOM.sessionStatus || $("#session-status")).textContent = 'Тренировка завершена ✓';
     (DOM.btnFinish || $("#btn-finish")).style.display = 'none';
     CURRENT_SESSION = null;
+    
+    // Проверяем завершение недели 3 и обновляем ТМ
+    await updateTMAfterCycle();
   } catch (error) {
     console.error('Failed to finish session:', error);
     showNotification('Ошибка завершения тренировки', 'error');
@@ -1903,6 +2119,143 @@ function updateProgress(percent, status) {
   }
 }
 
+// Проверка первого запуска
+async function checkFirstLaunch() {
+  try {
+    const tmData = await dbModule.query('SELECT COUNT(*) as count FROM tm WHERE tm_kg IS NOT NULL AND tm_kg > 0');
+    return !tmData || tmData.length === 0 || tmData[0].count === 0;
+  } catch (error) {
+    console.warn('Failed to check first launch:', error);
+    return true; // В случае ошибки считаем первым запуском
+  }
+}
+
+// Показ онбординга
+async function showOnboarding() {
+  // Скрываем основной интерфейс
+  document.querySelector('main').style.display = 'none';
+  document.querySelector('header').style.display = 'none';
+  document.querySelector('.bottom-nav')?.style.setProperty('display', 'none');
+  
+  // Создаем экран онбординга
+  const onboarding = document.createElement('div');
+  onboarding.className = 'onboarding-screen';
+  onboarding.innerHTML = `
+    <div class="onboarding-content">
+      <h2>Добро пожаловать в MESO!</h2>
+      <p style="margin: 16px 0; color: var(--text-muted);">
+        Для начала работы нужно указать базовые веса для упражнений.
+      </p>
+      <p style="margin-bottom: 24px; color: var(--text-muted);">
+        <strong>Вопрос:</strong> Какой вес вы можете поднять на 5-8 повторов с хорошей техникой?
+      </p>
+      <div id="onboarding-exercises" class="onboarding-exercises"></div>
+      <div class="onboarding-actions">
+        <button id="onboarding-save" class="btn primary">Сохранить и начать</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(onboarding);
+  
+  // Загружаем все упражнения из плана
+  const allExercises = [];
+  for (const day of Object.keys(PLAN)) {
+    for (const ex of PLAN[day]) {
+      if (!allExercises.find(e => e.name === ex.name)) {
+        allExercises.push(ex);
+      }
+    }
+  }
+  
+  const exercisesContainer = document.getElementById('onboarding-exercises');
+  allExercises.forEach(ex => {
+    const exerciseItem = document.createElement('div');
+    exerciseItem.className = 'onboarding-exercise-item';
+    exerciseItem.innerHTML = `
+      <label>${ex.name}</label>
+      <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" inputmode="decimal">
+    `;
+    exercisesContainer.appendChild(exerciseItem);
+  });
+  
+  // Обработчик сохранения
+  document.getElementById('onboarding-save').addEventListener('click', async () => {
+    await saveOnboardingWeights();
+  });
+}
+
+// Сохранение весов из онбординга
+async function saveOnboardingWeights() {
+  const inputs = document.querySelectorAll('#onboarding-exercises input');
+  const weights = {};
+  
+  for (const input of inputs) {
+    const exercise = input.dataset.exercise;
+    const weight = parseFloat(input.value);
+    
+    if (weight > 0) {
+      // Рассчитываем e1RM из веса на 6-7 повторов (среднее между 5-8)
+      const reps = 6.5; // среднее значение
+      const calculatedE1RM = e1rm(weight, reps);
+      // ТМ = 90% от e1RM
+      const tm = Math.round(calculatedE1RM * 0.9 * 10) / 10;
+      weights[exercise] = tm;
+    }
+  }
+  
+  // Сохраняем в БД
+  for (const [exercise, tm] of Object.entries(weights)) {
+    try {
+      await dbModule.execute(
+        `INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [exercise, tm]
+      );
+    } catch (error) {
+      console.error(`Failed to save TM for ${exercise}:`, error);
+    }
+  }
+  
+  // Удаляем онбординг и показываем основной интерфейс
+  document.querySelector('.onboarding-screen')?.remove();
+  document.querySelector('main').style.display = '';
+  document.querySelector('header').style.display = '';
+  document.querySelector('.bottom-nav')?.style.removeProperty('display');
+  
+  // Инициализируем интерфейс после онбординга
+  initGlobalHandlers();
+  await buildDayOptions();
+  
+  DOM.week.addEventListener('change', async () => {
+    await buildExercises();
+    await loadDashboard();
+  });
+  
+  DOM.day.addEventListener('change', async () => {
+    await buildExercises();
+  });
+  
+  await loadDashboard();
+  await loadPRs();
+  initHistoryFilters();
+  
+  // Обработчик кнопки сброса цикла
+  const resetBtn = document.getElementById('btn-reset-cycle');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      await resetCycle();
+      // После сброса показываем онбординг
+      const isFirstLaunch = await checkFirstLaunch();
+      if (isFirstLaunch) {
+        await showOnboarding();
+      }
+    });
+  }
+  
+  // Перезагружаем упражнения
+  await buildExercises();
+  showNotification('Базовые веса сохранены! Можно начинать тренировки.', 'success');
+}
+
 // Инициализация
 async function initApp() {
   try {
@@ -1920,6 +2273,17 @@ async function initApp() {
     await loadPlan();
     
     updateProgress(95, 'Инициализация интерфейса...');
+    
+    // Проверяем первый запуск
+    const isFirstLaunch = await checkFirstLaunch();
+    if (isFirstLaunch) {
+      // Скрываем индикатор загрузки
+      if (loading) {
+        loading.style.display = 'none';
+      }
+      await showOnboarding();
+      return; // Выходим, онбординг сам продолжит инициализацию
+    }
     
     // Инициализируем глобальные обработчики событий (Event Delegation)
     initGlobalHandlers();
@@ -1947,6 +2311,19 @@ async function initApp() {
     
     // Инициализируем фильтры истории
     initHistoryFilters();
+    
+    // Обработчик кнопки сброса цикла
+    const resetBtn = document.getElementById('btn-reset-cycle');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        await resetCycle();
+        // После сброса показываем онбординг
+        const isFirstLaunch = await checkFirstLaunch();
+        if (isFirstLaunch) {
+          await showOnboarding();
+        }
+      });
+    }
     
     updateProgress(100, 'Готово!');
     
