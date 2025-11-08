@@ -13,10 +13,16 @@ if (window.__MESO_MODULE_LOADED__) {
   console.warn('app.js уже загружен, пропускаем повторную загрузку');
   // Модуль уже загружен, прекращаем выполнение
   // Все дальнейшие объявления будут пропущены
+  throw new Error('Module already loaded');
 }
 window.__MESO_MODULE_LOADED__ = true;
 
 // === КОНСТАНТЫ (из конфига) ===
+// Проверяем, что CONFIG загружен
+if (typeof CONFIG === 'undefined') {
+  console.error('CONFIG не загружен! Проверьте загрузку config.js');
+  throw new Error('CONFIG is not defined. Check config.js loading.');
+}
 const LIMITS = CONFIG.LIMITS;
 
 let PLAN = {};
