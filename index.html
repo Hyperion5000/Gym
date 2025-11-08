@@ -447,12 +447,12 @@
         // Загружаем модули после загрузки SQL.js
         // Сначала config.js, потом app.js (app.js импортирует из config.js)
         function loadAppJS() {
-          const existingScript = document.querySelector('script[src="./app.js"]');
+          const existingScript = document.querySelector('script[src*="app.js"]');
           if (!existingScript && !window.__MESO_APP_LOADED__) {
             window.__MESO_APP_LOADED__ = true;
             const script = document.createElement('script');
             script.type = 'module';
-            script.src = './app.js';
+            script.src = './app.js?v=' + Date.now();
             
             // Обработка успешной загрузки
             script.onload = () => {
@@ -485,11 +485,12 @@
           }
         }
         
-        const existingConfig = document.querySelector('script[src="./config.js"]');
-        if (!existingConfig) {
+        const existingConfig = document.querySelector('script[src*="config.js"]');
+        if (!existingConfig && !window.__MESO_CONFIG_LOADED__) {
+          window.__MESO_CONFIG_LOADED__ = true;
           const configScript = document.createElement('script');
           configScript.type = 'module';
-          configScript.src = './config.js';
+          configScript.src = './config.js?v=' + Date.now();
           
           // Обработка успешной загрузки config.js
           configScript.onload = () => {
