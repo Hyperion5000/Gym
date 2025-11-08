@@ -610,6 +610,7 @@ async function buildExercises() {
         `}
         <button class="btn-icon btn-toggle-details" data-exercise="${ex.name}" title="Показать детали">ℹ️</button>
       </div>
+      <div class="exercise-hint" data-exercise="${ex.name}" style="display: none;"></div>
       <div class="exercise-details-panel" style="display: none;">
         <div class="exercise-details-content">
           <div class="detail-item">
