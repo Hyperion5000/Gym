@@ -78,8 +78,8 @@ function weightFromRIR(tm, targetRIR, reps) {
   // Выводим w: w = tm / (1 + (rir + reps) / LIMITS.E1RM_FACTOR)
   const weight = tm / (1 + (rir + reps) / LIMITS.E1RM_FACTOR);
   
-  // Округляем до шага веса (2.5 кг)
-  const rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+  // Округляем до стандартных блинов
+  const rounded = roundToStandardPlates(weight);
   
   // Проверяем минимальный вес
   return rounded >= LIMITS.MIN_WEIGHT ? rounded : null;
@@ -112,6 +112,39 @@ function targetToNumber(t) {
   }
   const n = Number(t.replace(',', '.'));
   return isNaN(n) ? null : n;
+}
+
+// Округление до стандартных блинов (1.25, 2.5, 5 кг)
+function roundToStandardPlates(weight) {
+  if (!weight || weight <= 0) return 0;
+  
+  // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
+  const plates = [1.25, 2.5, 5, 10, 15, 20, 25];
+  
+  // Округляем до ближайшего стандартного блина
+  let rounded = weight;
+  let minDiff = Infinity;
+  
+  for (const plate of plates) {
+    // Проверяем кратные блина
+    for (let multiplier = 1; multiplier <= 20; multiplier++) {
+      const candidate = plate * multiplier;
+      const diff = Math.abs(weight - candidate);
+      if (diff < minDiff) {
+        minDiff = diff;
+        rounded = candidate;
+      }
+      // Если уже слишком далеко, прекращаем
+      if (candidate > weight * 1.5) break;
+    }
+  }
+  
+  // Если разница слишком большая, используем стандартное округление до 2.5
+  if (minDiff > 2.5) {
+    rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+  }
+  
+  return Math.max(0, Math.round(rounded * 10) / 10);
 }
 
 function todayISO() {
@@ -452,6 +485,7 @@ async function resetCycle() {
 }
 
 // Автоматическое обновление ТМ после сохранения сета (только для типа A)
+// Улучшенная версия: обновляет ТМ на основе лучшего e1RM за последние 4 недели
 async function updateTMFromSet(exercise, e1rm) {
   if (!exercise || !e1rm || e1rm <= 0) return;
   
@@ -471,44 +505,82 @@ async function updateTMFromSet(exercise, e1rm) {
       return;
     }
     
-    // Проверяем, есть ли уже ТМ для этого упражнения
-    const existingTM = await dbModule.getOne(
-      'SELECT tm_kg FROM tm WHERE exercise = ?',
+    // Получаем лучший e1RM за последние 4 недели (28 дней)
+    const bestE1RM = await dbModule.getOne(
+      `SELECT MAX(e1rm) as best_e1rm 
+       FROM tracker 
+       WHERE exercise = ? AND date >= date('now', '-28 days') AND e1rm > 0`,
       [exercise]
     );
     
-    // Если ТМ уже задан, не перезаписываем (пользователь мог задать вручную)
-    if (existingTM && existingTM.tm_kg && existingTM.tm_kg > 0) {
-      return;
-    }
+    const bestE1RMValue = bestE1RM?.best_e1rm || e1rm;
     
-    // Рассчитываем ТМ = 90% от e1RM
-    const newTM = Math.round(e1rm * 0.9 * 10) / 10;
+    // Рассчитываем ТМ = 90% от лучшего e1RM за последние 4 недели
+    const newTM = Math.round(bestE1RMValue * 0.9 * 10) / 10;
     
-    // Сохраняем ТМ в БД (используем INSERT OR REPLACE для совместимости с SQL.js)
-    await dbModule.execute(
-      `INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
-      [exercise, newTM]
+    // Проверяем текущий ТМ
+    const existingTM = await dbModule.getOne(
+      'SELECT tm_kg, updated_at FROM tm WHERE exercise = ?',
+      [exercise]
     );
     
-    // Обновляем ТМ в интерфейсе, если карточка упражнения видна
-    const card = document.querySelector(`.exercise-card[data-exercise="${exercise}"]`);
-    if (card) {
-      card.dataset.tm = newTM;
-      const tmValue = card.querySelector('.tm-value');
-      if (tmValue) {
-        tmValue.textContent = newTM;
-        // Обновляем подсказку, что ТМ теперь автоматический
-        const tmDisplay = card.querySelector('.tm-display');
-        if (tmDisplay) {
-          tmDisplay.title = 'Тренировочный максимум (90% от 1RM) - авто';
+    // Если ТМ уже есть, обновляем только если новый ТМ больше текущего на 2.5 кг
+    // Это предотвращает случайные понижения ТМ из-за плохих тренировок
+    if (existingTM && existingTM.tm_kg && existingTM.tm_kg > 0) {
+      // Обновляем только если новый ТМ значительно больше (прогрессия)
+      // или если прошло больше 7 дней с последнего обновления
+      const daysSinceUpdate = existingTM.updated_at 
+        ? Math.floor((new Date() - new Date(existingTM.updated_at)) / (1000 * 60 * 60 * 24))
+        : 999;
+      
+      if (newTM >= existingTM.tm_kg - 2.5 || daysSinceUpdate >= 7) {
+        // Обновляем ТМ
+        await dbModule.execute(
+          `UPDATE tm SET tm_kg = ?, updated_at = CURRENT_TIMESTAMP WHERE exercise = ?`,
+          [newTM, exercise]
+        );
+        
+        // Обновляем в интерфейсе
+        const card = document.querySelector(`.exercise-card[data-exercise="${exercise}"]`);
+        if (card) {
+          card.dataset.tm = newTM;
+          const tmValue = card.querySelector('.tm-value');
+          if (tmValue) {
+            tmValue.textContent = newTM;
+            const tmDisplay = card.querySelector('.tm-display');
+            if (tmDisplay) {
+              tmDisplay.title = `Тренировочный максимум (90% от лучшего e1RM за 4 недели: ${bestE1RMValue} кг) - авто`;
+            }
+          }
+          computeCard(card);
         }
+        
+        console.log(`✅ ТМ обновлен для ${exercise}: ${newTM} кг (90% от лучшего e1RM ${bestE1RMValue} кг за 4 недели)`);
       }
-      // Пересчитываем карточку с новым ТМ
-      computeCard(card);
+    } else {
+      // Если ТМ нет, создаем новый
+      await dbModule.execute(
+        `INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+        [exercise, newTM]
+      );
+      
+      // Обновляем в интерфейсе
+      const card = document.querySelector(`.exercise-card[data-exercise="${exercise}"]`);
+      if (card) {
+        card.dataset.tm = newTM;
+        const tmValue = card.querySelector('.tm-value');
+        if (tmValue) {
+          tmValue.textContent = newTM;
+          const tmDisplay = card.querySelector('.tm-display');
+          if (tmDisplay) {
+            tmDisplay.title = 'Тренировочный максимум (90% от 1RM) - авто';
+          }
+        }
+        computeCard(card);
+      }
+      
+      console.log(`✅ ТМ автоматически установлен для ${exercise}: ${newTM} кг (90% от e1RM ${e1rm} кг)`);
     }
-    
-    console.log(`✅ ТМ автоматически установлен для ${exercise}: ${newTM} кг (90% от e1RM ${e1rm} кг)`);
   } catch (error) {
     console.warn(`Failed to update TM for ${exercise}:`, error);
   }
@@ -1202,6 +1274,59 @@ function initGlobalHandlers() {
       }
     }
     
+    // АВТОМАТИЧЕСКОЕ ЗАПОЛНЕНИЕ ВСЕХ СЕТОВ НА ОСНОВЕ ПЕРВОГО СЕТА
+    // Если заполнен первый сет (вес и повторы), предлагаем заполнить остальные
+    if ((inp.classList.contains('w') || inp.classList.contains('r'))) {
+      const setRow = inp.closest('.set-row');
+      if (setRow && setRow.dataset.set === '1') {
+        const firstWeightInput = setRow.querySelector('input.w');
+        const firstRepsInput = setRow.querySelector('input.r');
+        const firstWeight = Number(normalizeNumber(firstWeightInput?.value || 0));
+        const firstReps = Number(normalizeNumber(firstRepsInput?.value || 0));
+        
+        // Если первый сет полностью заполнен (вес > 0 и повторы > 0)
+        if (firstWeight > 0 && firstReps > 0) {
+          // Проверяем, есть ли пустые сеты
+          const allSetRows = card.querySelectorAll('.set-row:not(.set-header)');
+          let hasEmptySets = false;
+          
+          for (let i = 1; i < allSetRows.length; i++) {
+            const row = allSetRows[i];
+            const wInput = row.querySelector('input.w');
+            const rInput = row.querySelector('input.r');
+            const w = Number(normalizeNumber(wInput?.value || 0));
+            const r = Number(normalizeNumber(rInput?.value || 0));
+            
+            if ((!w || w === 0) || (!r || r === 0)) {
+              hasEmptySets = true;
+              break;
+            }
+          }
+          
+          // Если есть пустые сеты, заполняем их значениями из первого сета
+          if (hasEmptySets) {
+            // Небольшая задержка, чтобы пользователь увидел заполнение первого сета
+            setTimeout(() => {
+              for (let i = 1; i < allSetRows.length; i++) {
+                const row = allSetRows[i];
+                const wInput = row.querySelector('input.w');
+                const rInput = row.querySelector('input.r');
+                const w = Number(normalizeNumber(wInput?.value || 0));
+                const r = Number(normalizeNumber(rInput?.value || 0));
+                
+                // Заполняем только если оба поля пустые
+                if ((!w || w === 0) && (!r || r === 0)) {
+                  if (wInput) wInput.value = firstWeight;
+                  if (rInput) rInput.value = firstReps;
+                }
+              }
+              computeCard(card);
+            }, 500);
+          }
+        }
+      }
+    }
+    
     computeCard(card);
     
     // Автосохранение в БД при заполнении обоих полей (вес + повторы)
@@ -1504,7 +1629,7 @@ function fillFromLast(exName) {
   }
 }
 
-// Рекомендация веса
+// Улучшенная рекомендация веса на основе среднего значения последних тренировок
 async function suggestForExercise(exName) {
   const week = Number((DOM.week || $("#week")).value);
   const day = (DOM.day || $("#day")).value;
@@ -1516,36 +1641,58 @@ async function suggestForExercise(exName) {
   const target_rir = targetToNumber(item.target[week]) ?? 2;
   
   try {
-    let lastSet = null;
-    try {
-      // Проверяем существование представления перед запросом
-      const viewCheck = await dbModule.query(
-        `SELECT name FROM sqlite_master WHERE type='view' AND name='v_last_sets'`
-      );
-      if (viewCheck && viewCheck.length > 0) {
-        lastSet = await dbModule.getOne(
-          'SELECT * FROM v_last_sets WHERE exercise = ?',
-          [exName]
-        );
-      }
-    } catch (error) {
-      // Тихая обработка ошибки - представление еще не создано
-    }
+    // Получаем последние 3-5 тренировок для более точной рекомендации
+    const recentSets = await dbModule.query(
+      `SELECT weight, reps, rir, e1rm, date 
+       FROM tracker 
+       WHERE exercise = ? AND date >= date('now', '-28 days')
+       ORDER BY date DESC, set_no ASC
+       LIMIT 15`,
+      [exName]
+    );
     
-    if (!lastSet) {
+    if (!recentSets || recentSets.length === 0) {
       alert('Нет истории для рекомендации');
       return;
     }
     
-    const tm_est = lastSet.weight / (1 + lastSet.reps / LIMITS.E1RM_FACTOR);
-    let w_new = tm_est * (1 + target_reps / LIMITS.E1RM_FACTOR);
+    // Группируем по тренировкам (датам) и берем лучший сет из каждой тренировки
+    const workouts = {};
+    recentSets.forEach(set => {
+      if (!workouts[set.date] || set.e1rm > workouts[set.date].e1rm) {
+        workouts[set.date] = set;
+      }
+    });
     
-    if (target_rir != null && lastSet.rir != null) {
-      if (target_rir > lastSet.rir) w_new -= LIMITS.WEIGHT_ROUNDING;
-      else if (target_rir < lastSet.rir) w_new += LIMITS.WEIGHT_ROUNDING;
+    const bestSets = Object.values(workouts).slice(0, 5); // Последние 5 тренировок
+    
+    // Рассчитываем средний e1RM из лучших сетов последних тренировок
+    const avgE1RM = bestSets.reduce((sum, set) => sum + (set.e1rm || 0), 0) / bestSets.length;
+    
+    // Рассчитываем средний RIR для адаптивной коррекции
+    const avgRIR = bestSets
+      .filter(set => set.rir != null)
+      .reduce((sum, set) => sum + set.rir, 0) / bestSets.filter(set => set.rir != null).length;
+    
+    // Оцениваем ТМ на основе среднего e1RM
+    const tm_est = avgE1RM * 0.9;
+    
+    // Рассчитываем вес для целевых повторов и RIR
+    let w_new = weightFromRIR(tm_est, target_rir, target_reps);
+    
+    // Адаптивная коррекция: если пользователь постоянно не попадает в целевой RIR
+    if (avgRIR != null && target_rir != null) {
+      const rirDiff = avgRIR - target_rir;
+      // Если средний RIR выше целевого (легче), увеличиваем вес
+      // Если средний RIR ниже целевого (тяжелее), уменьшаем вес
+      if (Math.abs(rirDiff) > 0.5) {
+        const adjustment = Math.sign(rirDiff) * LIMITS.WEIGHT_ROUNDING;
+        w_new = (w_new || 0) + adjustment;
+      }
     }
     
-    w_new = Math.round(w_new / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+    // Округляем до стандартных блинов
+    w_new = roundToStandardPlates(w_new);
     if (w_new < 0) w_new = 0;
     
     const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
@@ -1554,11 +1701,13 @@ async function suggestForExercise(exName) {
     const inputsW = card.querySelectorAll('input.w');
     const inputsR = card.querySelectorAll('input.r');
     
+    // Заполняем первый пустой сет
     for (let i = 0; i < inputsW.length; i++) {
       if (!inputsW[i].value && !inputsR[i].value) {
         inputsW[i].value = w_new;
         inputsR[i].focus();
         computeCard(card);
+        showNotification(`💡 Рекомендуемый вес: ${w_new} кг (на основе последних ${bestSets.length} тренировок)`, 'info', 3000);
         break;
       }
     }
@@ -1566,6 +1715,39 @@ async function suggestForExercise(exName) {
     console.warn('Failed to suggest weight:', error);
     alert('Не удалось рассчитать вес');
   }
+}
+
+// Округление до стандартных блинов (1.25, 2.5, 5 кг)
+function roundToStandardPlates(weight) {
+  if (!weight || weight <= 0) return 0;
+  
+  // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
+  const plates = [1.25, 2.5, 5, 10, 15, 20, 25];
+  
+  // Округляем до ближайшего стандартного блина
+  let rounded = weight;
+  let minDiff = Infinity;
+  
+  for (const plate of plates) {
+    // Проверяем кратные блина
+    for (let multiplier = 1; multiplier <= 20; multiplier++) {
+      const candidate = plate * multiplier;
+      const diff = Math.abs(weight - candidate);
+      if (diff < minDiff) {
+        minDiff = diff;
+        rounded = candidate;
+      }
+      // Если уже слишком далеко, прекращаем
+      if (candidate > weight * 1.5) break;
+    }
+  }
+  
+  // Если разница слишком большая, используем стандартное округление до 2.5
+  if (minDiff > 2.5) {
+    rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+  }
+  
+  return Math.max(0, Math.round(rounded * 10) / 10);
 }
 
 // Сбор данных из карточек
