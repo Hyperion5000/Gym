@@ -114,7 +114,7 @@ async function loadDatabase() {
 }
 
 // Текущая версия схемы
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 // Получение версии схемы
 async function getSchemaVersion() {
@@ -253,6 +253,36 @@ async function runMigrations() {
       if (currentVersion < 2) {
         // Таблица уже создана в schema.sql
         await setSchemaVersion(2, 'Добавлено версионирование схемы');
+      }
+      
+      // Миграция с версии 2 на 3 (добавление колонок locked и source в таблицу tm)
+      if (currentVersion < 3) {
+        try {
+          // Добавляем колонку locked если её нет
+          try {
+            await execute('ALTER TABLE tm ADD COLUMN locked INTEGER DEFAULT 0');
+          } catch (e) {
+            // Колонка уже существует, игнорируем
+            if (!e.message.includes('duplicate column')) {
+              console.warn('Could not add locked column:', e.message);
+            }
+          }
+          
+          // Добавляем колонку source если её нет
+          try {
+            await execute('ALTER TABLE tm ADD COLUMN source TEXT DEFAULT "auto"');
+          } catch (e) {
+            // Колонка уже существует, игнорируем
+            if (!e.message.includes('duplicate column')) {
+              console.warn('Could not add source column:', e.message);
+            }
+          }
+          
+          await setSchemaVersion(3, 'Добавлены колонки locked и source в таблицу tm');
+        } catch (error) {
+          console.error('Migration 2->3 failed:', error);
+          // Продолжаем выполнение даже если миграция не удалась
+        }
       }
       
       await saveDatabase();

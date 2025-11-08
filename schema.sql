@@ -1,6 +1,6 @@
 -- === MESO SQL.js Schema ===
 -- Локальная БД без авторизации
--- Schema Version: 2
+-- Schema Version: 3
 
 create table if not exists schema_version (
   version integer primary key,
