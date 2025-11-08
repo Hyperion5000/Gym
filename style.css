@@ -1513,13 +1513,17 @@ ul li:last-child {
   background: var(--bg);
   z-index: 10001;
   overflow-y: auto;
-  padding: 20px;
+  overflow-x: hidden;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .onboarding-content {
   max-width: 600px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 20px 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .onboarding-content h2 {
@@ -1575,18 +1579,22 @@ ul li:last-child {
   gap: 8px;
   align-items: center;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .onboarding-exercise-item > div:first-of-type input {
   width: auto;
+  box-sizing: border-box;
 }
 
 .onboarding-exercise-item > div:first-of-type input[data-type="weight"] {
   flex: 1;
+  min-width: 120px;
 }
 
 .onboarding-exercise-item > div:first-of-type input[data-type="reps"] {
   width: 80px;
+  flex-shrink: 0;
 }
 
 .onboarding-exercise-item > div:last-of-type {
@@ -1607,12 +1615,47 @@ ul li:last-child {
 }
 
 @media (max-width: 768px) {
+  .onboarding-screen {
+    padding: 12px;
+  }
+  
   .onboarding-content {
-    padding: 20px 16px;
+    padding: 16px 12px;
+    max-width: 100%;
+  }
+  
+  .onboarding-content h2 {
+    font-size: 24px;
   }
   
   .onboarding-exercises {
     max-height: 50vh;
+    padding: 4px;
+  }
+  
+  .onboarding-exercise-item {
+    padding: 12px;
+  }
+  
+  .onboarding-exercise-item > div:first-of-type {
+    flex-wrap: wrap;
+  }
+  
+  .onboarding-exercise-item > div:first-of-type input[data-type="weight"] {
+    width: 100%;
+    min-width: 100%;
+    margin-bottom: 8px;
+  }
+  
+  .onboarding-exercise-item > div:first-of-type input[data-type="reps"] {
+    width: calc(50% - 4px);
+    min-width: 80px;
+  }
+  
+  .onboarding-exercise-item > div:first-of-type span {
+    width: 100%;
+    text-align: center;
+    margin: 4px 0;
   }
 }
 

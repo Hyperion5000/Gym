@@ -2195,6 +2195,19 @@ function updateProgress(percent, status) {
 // Проверка первого запуска
 async function checkFirstLaunch() {
   try {
+    // Проверяем наличие данных в tracker или sessions - если есть, значит не первый запуск
+    const trackerData = await dbModule.query('SELECT COUNT(*) as count FROM tracker');
+    const sessionsData = await dbModule.query('SELECT COUNT(*) as count FROM sessions');
+    
+    const hasTrackerData = trackerData && trackerData.length > 0 && trackerData[0].count > 0;
+    const hasSessionsData = sessionsData && sessionsData.length > 0 && sessionsData[0].count > 0;
+    
+    // Если есть данные в tracker или sessions, значит не первый запуск (даже если нет ТМ)
+    if (hasTrackerData || hasSessionsData) {
+      return false;
+    }
+    
+    // Если нет данных в tracker/sessions, проверяем ТМ
     const tmData = await dbModule.query('SELECT COUNT(*) as count FROM tm WHERE tm_kg IS NOT NULL AND tm_kg > 0');
     return !tmData || tmData.length === 0 || tmData[0].count === 0;
   } catch (error) {
@@ -2216,17 +2229,9 @@ async function showOnboarding() {
   onboarding.innerHTML = `
     <div class="onboarding-content">
       <h2>Добро пожаловать в MESO!</h2>
-      <p style="margin: 16px 0; color: var(--text-muted);">
-        Для начала работы нужно указать базовые веса для упражнений.
-      </p>
-      <p style="margin-bottom: 24px; color: var(--text-muted);">
-        <strong>Важно:</strong> Тренировочный максимум (ТМ) требуется только для основных упражнений типа <strong>A</strong> (присед, жим, тяга).
-      </p>
-      <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9em;">
-        💡 <strong>Для упражнений типа A:</strong> Введите вес и количество повторов (например, 80кг × 6 повторов), которые вы можете сделать с хорошей техникой. Приложение автоматически рассчитает ваш ТМ.
-      </p>
-      <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9em;">
-        💡 <strong>Для аксессуарных упражнений (типы B, C, D):</strong> ТМ не требуется. Просто вводите вес и повторы во время тренировки.
+      <p style="margin: 16px 0 24px 0; color: var(--text-muted); line-height: 1.6;">
+        Укажите базовые веса для <strong>основных упражнений типа A</strong> (присед, жим, тяга).<br>
+        Для аксессуарных упражнений (B, C, D) веса можно указать позже во время тренировки.
       </p>
       <div id="onboarding-exercises" class="onboarding-exercises"></div>
       <div class="onboarding-actions">
@@ -2254,25 +2259,20 @@ async function showOnboarding() {
     // Только для типа A показываем поля для ТМ
     if (ex.type === 'A') {
       exerciseItem.innerHTML = `
-        <label>${ex.name} <span style="color: var(--text-muted); font-size: 0.85em;">(тип A - требуется ТМ)</span></label>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1;">
+        <label>${ex.name}</label>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1; min-width: 120px;">
           <span style="color: var(--text-muted);">×</span>
-          <input type="number" step="1" min="1" max="20" placeholder="5-8" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
+          <input type="number" step="1" min="1" max="20" placeholder="6" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
           <span style="color: var(--text-muted); font-size: 0.9em;">повт.</span>
         </div>
-        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
-          Пример: если можете сделать 80кг × 6 повторов, введите 80 и 6. ТМ будет рассчитан автоматически.
+        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 6px;">
+          Пример: 80кг × 6 повторов → ТМ рассчитается автоматически
         </div>
       `;
     } else {
-      // Для типов B, C, D не требуем ТМ
-      exerciseItem.innerHTML = `
-        <label>${ex.name} <span style="color: var(--text-muted); font-size: 0.85em;">(тип ${ex.type} - ТМ не требуется)</span></label>
-        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px; padding: 8px; background: var(--card-bg); border-radius: 4px;">
-          💡 Для аксессуарных упражнений ТМ не требуется. Просто вводите вес и повторы во время тренировки.
-        </div>
-      `;
+      // Для типов B, C, D не показываем поля
+      exerciseItem.style.display = 'none';
     }
     exercisesContainer.appendChild(exerciseItem);
   });
