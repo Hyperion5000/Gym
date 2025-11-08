@@ -2785,9 +2785,16 @@ function showExportReminder(message, showDismiss) {
 }
 
 // Запуск
-setupOnlineIndicator();
-initTheme();
-initApp();
+// Защита от повторного выполнения
+if (!window.__MESO_APP_INITIALIZED__) {
+  window.__MESO_APP_INITIALIZED__ = true;
+  setupOnlineIndicator();
+  initTheme();
+  initExportReminder();
+  initApp();
+} else {
+  console.warn('initApp уже был вызван, пропускаем повторный вызов');
+}
 
 // Проверяем напоминание об экспорте через 5 секунд после загрузки
 setTimeout(checkExportReminder, 5000);
