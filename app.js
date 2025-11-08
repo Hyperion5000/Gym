@@ -2222,13 +2222,20 @@ async function editSet(id) {
     
     // Пересчитываем значения
     const e1 = e1rm(weight, reps);
-    const rir = set.target_rir ? estRIR(weight * (1 + reps / LIMITS.E1RM_FACTOR), weight, reps) : null;
+    
+    // RIR считается от TM, а не от e1RM
+    const tmRow = await dbModule.getOne('SELECT tm_kg FROM tm WHERE exercise = ?', [set.exercise]);
+    const tm = tmRow?.tm_kg ?? null;
+    const rir = (set.target_rir && tm) ? estRIR(tm, weight, reps) : null;
     const rpe = rpeFromRir(rir);
     
     await dbModule.execute(
       'UPDATE tracker SET weight = ?, reps = ?, e1rm = ?, rir = ?, rpe = ? WHERE id = ?',
       [weight, reps, e1, rir, rpe, id]
     );
+    
+    // Обновляем TM если это упражнение типа A
+    await updateTMFromSet(set.exercise, e1);
     
     showNotification('Сет обновлен', 'success');
     await loadHistory();

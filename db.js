@@ -519,19 +519,33 @@ async function decompressData(compressedData) {
 async function exportDatabase() {
   if (!db) await initDatabase();
   
-  const data = db.export();
-  const base64 = btoa(String.fromCharCode(...new Uint8Array(data)));
-  const jsonString = JSON.stringify({ 
-    version: 2, 
-    data: base64, 
+  // 1) Сырые байты SQLite
+  const bytes = db.export(); // Uint8Array
+  
+  // 2) В base64 без ошибок (избегаем spread оператора для больших массивов)
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  const base64 = btoa(bin);
+  
+  // 3) Несжатый JSON
+  const jsonString = JSON.stringify({
+    version: 2,
+    data: base64,
     timestamp: new Date().toISOString(),
-    compressed: false 
+    compressed: false
   });
   
-  // Пытаемся сжать
+  // 4) Попробовать gzip (CompressionStream с фолбэком уже есть)
   try {
-    const compressed = await compressData(jsonString);
-    const compressedBase64 = btoa(String.fromCharCode(...compressed));
+    const compressed = await compressData(jsonString); // Uint8Array
+    let cbin = '';
+    for (let i = 0; i < compressed.length; i++) {
+      cbin += String.fromCharCode(compressed[i]);
+    }
+    const compressedBase64 = btoa(cbin);
+    
     const originalSize = new Blob([jsonString]).size;
     const compressedSize = compressed.length;
     
