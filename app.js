@@ -19,7 +19,7 @@ window.__MESO_MODULE_LOADED__ = true;
 // === КОНСТАНТЫ (из конфига) ===
 // CONFIG импортируется через import, поэтому он должен быть доступен
 // Если CONFIG не определен, это означает проблему с загрузкой config.js
-const LIMITS = CONFIG?.LIMITS || {
+const LIMITS = (CONFIG && CONFIG.LIMITS) ? CONFIG.LIMITS : {
   E1RM_FACTOR: 30,
   WEIGHT_ROUNDING: 2.5,
   MAX_WEIGHT: 500,
@@ -819,7 +819,7 @@ async function updateTMFromSet(exercise, e1rm, actualRIR, targetRIR, week) {
       ]
     );
     
-    const bestE1RMValue = bestE1RM?.best_e1rm || e1rm;
+    const bestE1RMValue = (bestE1RM && bestE1RM.best_e1rm) ? bestE1RM.best_e1rm : e1rm;
     const sessionTM = Math.round(bestE1RMValue * 0.9 * 10) / 10;
     
     // Проверяем текущий ТМ
@@ -867,8 +867,8 @@ async function updateTMFromSet(exercise, e1rm, actualRIR, targetRIR, week) {
           ]
         );
         
-        const recentMaxE1RM = recentSessions[0]?.max_e1rm || 0;
-        const sessionCount = recentSessions[0]?.session_count || 0;
+        const recentMaxE1RM = (recentSessions[0] && recentSessions[0].max_e1rm) ? recentSessions[0].max_e1rm : 0;
+        const sessionCount = (recentSessions[0] && recentSessions[0].session_count) ? recentSessions[0].session_count : 0;
         
         // Если менее 2 сессий или e1RM не существенно ниже TM, ограничиваем падение
         if (sessionCount < 2 || recentMaxE1RM > existingTM.tm_kg * 0.95) {
