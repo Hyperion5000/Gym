@@ -1729,27 +1729,35 @@ function initGlobalHandlers() {
       
       if (!exercise) return;
       
-      const currentLocked = await isTMLocked(exercise);
-      const newLocked = !currentLocked;
-      
-      await setTMLock(exercise, newLocked);
-      
-      // Обновляем UI
-      btn.textContent = newLocked ? '🔒' : '🔓';
-      btn.title = newLocked ? 'Разблокировать TM' : 'Зафиксировать TM';
-      
-      const tmBadge = card.querySelector('.tm-badge');
-      if (tmBadge) {
-        const tmValueEl = card.querySelector('.tm-value');
-        const tmValue = (tmValueEl && tmValueEl.textContent) ? tmValueEl.textContent : '';
-        tmBadge.innerHTML = `TM ${tmValue} кг${newLocked ? ' 🔒' : ' <span style="font-size: 0.7em; opacity: 0.7;">Auto</span>'}`;
-        tmBadge.title = `Тренировочный максимум${newLocked ? ' (зафиксирован)' : ' (авто)'}`;
-      }
-      
-      showNotification(
-        newLocked ? `TM для "${exercise}" зафиксирован` : `TM для "${exercise}" разблокирован`,
-        'success'
-      );
+      // Обертываем в async функцию для использования await
+      (async () => {
+        try {
+          const currentLocked = await isTMLocked(exercise);
+          const newLocked = !currentLocked;
+          
+          await setTMLock(exercise, newLocked);
+          
+          // Обновляем UI
+          btn.textContent = newLocked ? '🔒' : '🔓';
+          btn.title = newLocked ? 'Разблокировать TM' : 'Зафиксировать TM';
+          
+          const tmBadge = card.querySelector('.tm-badge');
+          if (tmBadge) {
+            const tmValueEl = card.querySelector('.tm-value');
+            const tmValue = (tmValueEl && tmValueEl.textContent) ? tmValueEl.textContent : '';
+            tmBadge.innerHTML = `TM ${tmValue} кг${newLocked ? ' 🔒' : ' <span style="font-size: 0.7em; opacity: 0.7;">Auto</span>'}`;
+            tmBadge.title = `Тренировочный максимум${newLocked ? ' (зафиксирован)' : ' (авто)'}`;
+          }
+          
+          showNotification(
+            newLocked ? `TM для "${exercise}" зафиксирован` : `TM для "${exercise}" разблокирован`,
+            'success'
+          );
+        } catch (error) {
+          console.error('Failed to toggle TM lock:', error);
+          showNotification('Ошибка при изменении блокировки TM', 'error');
+        }
+      })();
     }
     
     // Обработчик редактирования ТМ
