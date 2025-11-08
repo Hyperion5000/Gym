@@ -1,4 +1,11 @@
 // === MESO App (SQL.js) ===
+// Защита от повторного выполнения модуля
+if (window.__MESO_MODULE_LOADED__) {
+  console.warn('app.js уже загружен, пропускаем повторную загрузку');
+  throw new Error('Module already loaded');
+}
+window.__MESO_MODULE_LOADED__ = true;
+
 import * as dbModule from './db.js';
 
 // === КОНСТАНТЫ ===
