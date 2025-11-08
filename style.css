@@ -1570,6 +1570,32 @@ ul li:last-child {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
+.onboarding-exercise-item > div:first-of-type {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.onboarding-exercise-item > div:first-of-type input {
+  width: auto;
+}
+
+.onboarding-exercise-item > div:first-of-type input[data-type="weight"] {
+  flex: 1;
+}
+
+.onboarding-exercise-item > div:first-of-type input[data-type="reps"] {
+  width: 80px;
+}
+
+.onboarding-exercise-item > div:last-of-type {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding-left: 4px;
+}
+
 .onboarding-actions {
   margin-top: 32px;
   display: flex;

@@ -2149,6 +2149,9 @@ async function showOnboarding() {
       <p style="margin-bottom: 24px; color: var(--text-muted);">
         <strong>Вопрос:</strong> Какой вес вы можете поднять на 5-8 повторов с хорошей техникой?
       </p>
+      <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9em;">
+        💡 <strong>Не знаете точный вес?</strong> Введите примерный вес и количество повторов, которые вы можете сделать с этим весом. Приложение автоматически рассчитает ваш тренировочный максимум (ТМ).
+      </p>
       <div id="onboarding-exercises" class="onboarding-exercises"></div>
       <div class="onboarding-actions">
         <button id="onboarding-save" class="btn primary">Сохранить и начать</button>
@@ -2173,7 +2176,15 @@ async function showOnboarding() {
     exerciseItem.className = 'onboarding-exercise-item';
     exerciseItem.innerHTML = `
       <label>${ex.name}</label>
-      <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" inputmode="decimal">
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1;">
+        <span style="color: var(--text-muted);">×</span>
+        <input type="number" step="1" min="1" max="20" placeholder="5-8" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
+        <span style="color: var(--text-muted); font-size: 0.9em;">повт.</span>
+      </div>
+      <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
+        Пример: если можете сделать 80кг × 6 повторов, введите 80 и 6
+      </div>
     `;
     exercisesContainer.appendChild(exerciseItem);
   });
@@ -2189,14 +2200,35 @@ async function saveOnboardingWeights() {
   const inputs = document.querySelectorAll('#onboarding-exercises input');
   const weights = {};
   
+  // Группируем inputs по упражнениям
+  const exerciseData = {};
   for (const input of inputs) {
     const exercise = input.dataset.exercise;
-    const weight = parseFloat(input.value);
+    const type = input.dataset.type; // 'weight' или 'reps'
     
-    if (weight > 0) {
-      // Рассчитываем e1RM из веса на 6-7 повторов (среднее между 5-8)
-      const reps = 6.5; // среднее значение
-      const calculatedE1RM = e1rm(weight, reps);
+    if (!exerciseData[exercise]) {
+      exerciseData[exercise] = { weight: null, reps: null };
+    }
+    
+    const value = parseFloat(input.value);
+    if (!isNaN(value) && value > 0) {
+      if (type === 'weight') {
+        exerciseData[exercise].weight = value;
+      } else if (type === 'reps') {
+        exerciseData[exercise].reps = value;
+      }
+    }
+  }
+  
+  // Рассчитываем ТМ для каждого упражнения
+  for (const [exercise, data] of Object.entries(exerciseData)) {
+    if (data.weight > 0) {
+      // Используем введенные повторы, или 6.5 по умолчанию
+      const reps = data.reps && data.reps > 0 ? data.reps : 6.5;
+      
+      // Рассчитываем e1RM из веса и повторов
+      const calculatedE1RM = e1rm(data.weight, reps);
+      
       // ТМ = 90% от e1RM
       const tm = Math.round(calculatedE1RM * 0.9 * 10) / 10;
       weights[exercise] = tm;
