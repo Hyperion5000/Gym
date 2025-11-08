@@ -348,83 +348,92 @@
 
   <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
   <script>
-    // Ждем загрузки SQL.js перед запуском модулей
-    (async function() {
-      // Ждем пока initSqlJs станет доступен
-      while (typeof initSqlJs === 'undefined') {
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
+    // Защита от повторного выполнения
+    if (window.__MESO_INIT_STARTED__) {
+      console.warn('Инициализация уже начата, пропускаем');
+    } else {
+      window.__MESO_INIT_STARTED__ = true;
       
-      // Убеждаемся что initSqlJs доступен глобально
-      if (typeof window !== 'undefined') {
-        window.initSqlJs = window.initSqlJs || initSqlJs;
-      }
-      
-      // Регистрируем service worker
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./service-worker.js').catch(err => {
-            console.warn('Service worker registration failed:', err);
-          });
-        });
-      }
-      
-      // Обработчики вкладок (работает как для десктоп, так и для bottom nav)
-      document.addEventListener('click', (e) => {
-        const t = e.target.closest('.tab');
-        if (!t || !t.dataset.tab) return;
-        
-        // Обновляем все вкладки (и в хедере, и в bottom nav)
-        document.querySelectorAll('.tab').forEach(tab => {
-          if (tab.dataset.tab === t.dataset.tab) {
-            tab.classList.add('active');
-          } else {
-            tab.classList.remove('active');
-          }
-        });
-        
-        // Переключаем страницы
-        document.querySelectorAll('.tabpage').forEach(x=>x.classList.remove('active'));
-        document.getElementById(t.dataset.tab).classList.add('active');
-        
-        // Прокручиваем вверх на мобильном
-        if (window.innerWidth <= 768) {
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Ждем загрузки SQL.js перед запуском модулей
+      (async function() {
+        // Ждем пока initSqlJs станет доступен
+        while (typeof initSqlJs === 'undefined') {
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
-      });
-      
-      // Загружаем модуль app.js после загрузки SQL.js
-      // Проверяем, что модуль еще не загружен
-      if (!document.querySelector('script[src="./app.js"]')) {
-        const script = document.createElement('script');
-        script.type = 'module';
-        script.src = './app.js';
         
-        // Обработка ошибок загрузки
-        script.onerror = (error) => {
-          console.error('Ошибка загрузки app.js:', error);
-          const loading = document.getElementById('loading');
-          if (loading) {
-            loading.innerHTML = `
-              <div style="text-align: center; max-width: 320px; padding: 24px;">
-                <div style="margin-bottom: 24px; font-size: 48px;">⚠️</div>
-                <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки</div>
-                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">
-                  Не удалось загрузить приложение. Пожалуйста, обновите страницу.
-                </div>
-                <button onclick="location.reload()" style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
-                  Обновить страницу
-                </button>
-              </div>
-            `;
+        // Убеждаемся что initSqlJs доступен глобально
+        if (typeof window !== 'undefined') {
+          window.initSqlJs = window.initSqlJs || initSqlJs;
+        }
+        
+        // Регистрируем service worker
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./service-worker.js').catch(err => {
+              console.warn('Service worker registration failed:', err);
+            });
+          });
+        }
+        
+        // Обработчики вкладок (работает как для десктоп, так и для bottom nav)
+        document.addEventListener('click', (e) => {
+          const t = e.target.closest('.tab');
+          if (!t || !t.dataset.tab) return;
+          
+          // Обновляем все вкладки (и в хедере, и в bottom nav)
+          document.querySelectorAll('.tab').forEach(tab => {
+            if (tab.dataset.tab === t.dataset.tab) {
+              tab.classList.add('active');
+            } else {
+              tab.classList.remove('active');
+            }
+          });
+          
+          // Переключаем страницы
+          document.querySelectorAll('.tabpage').forEach(x=>x.classList.remove('active'));
+          document.getElementById(t.dataset.tab).classList.add('active');
+          
+          // Прокручиваем вверх на мобильном
+          if (window.innerWidth <= 768) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }
-        };
+        });
         
-        document.body.appendChild(script);
-      } else {
-        console.warn('app.js уже загружается, пропускаем повторную загрузку');
-      }
-    })();
+        // Загружаем модуль app.js после загрузки SQL.js
+        // Проверяем, что модуль еще не загружен
+        const existingScript = document.querySelector('script[src="./app.js"]');
+        if (!existingScript && !window.__MESO_APP_LOADED__) {
+          window.__MESO_APP_LOADED__ = true;
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = './app.js';
+          
+          // Обработка ошибок загрузки
+          script.onerror = (error) => {
+            console.error('Ошибка загрузки app.js:', error);
+            const loading = document.getElementById('loading');
+            if (loading) {
+              loading.innerHTML = `
+                <div style="text-align: center; max-width: 320px; padding: 24px;">
+                  <div style="margin-bottom: 24px; font-size: 48px;">⚠️</div>
+                  <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки</div>
+                  <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">
+                    Не удалось загрузить приложение. Пожалуйста, обновите страницу.
+                  </div>
+                  <button onclick="location.reload()" style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                    Обновить страницу
+                  </button>
+                </div>
+              `;
+            }
+          };
+          
+          document.body.appendChild(script);
+        } else {
+          console.warn('app.js уже загружается или загружен, пропускаем повторную загрузку');
+        }
+      })();
+    }
   </script>
 </body>
 </html>
