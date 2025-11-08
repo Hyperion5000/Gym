@@ -98,8 +98,8 @@ if (typeof window.roundToStandardPlates === 'undefined') {
   };
 }
 
-// Используем функцию из window для избежания конфликтов модулей
-const roundToStandardPlates = (weight) => window.roundToStandardPlates(weight);
+// Используем функцию напрямую из window для избежания конфликтов модулей
+// Не создаем локальную константу, чтобы избежать ошибки при повторной загрузке модуля
 
 // Обратная функция: расчет веса по ТМ, целевому RIR и повторам
 function weightFromRIR(tm, targetRIR, reps) {
@@ -118,7 +118,7 @@ function weightFromRIR(tm, targetRIR, reps) {
   const weight = tm / (1 + (rir + reps) / LIMITS.E1RM_FACTOR);
   
   // Округляем до стандартных блинов
-  const rounded = roundToStandardPlates(weight);
+  const rounded = window.roundToStandardPlates(weight);
   
   // Проверяем минимальный вес
   return rounded >= LIMITS.MIN_WEIGHT ? rounded : null;
@@ -1698,7 +1698,7 @@ async function suggestForExercise(exName) {
     }
     
     // Округляем до стандартных блинов
-    w_new = roundToStandardPlates(w_new);
+    w_new = window.roundToStandardPlates(w_new);
     if (w_new < 0) w_new = 0;
     
     const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
