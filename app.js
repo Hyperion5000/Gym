@@ -3318,6 +3318,10 @@ async function exportDatabase() {
     
     showNotification(`✅ Экспорт завершен: ${workoutCount} тренировок`, 'success');
     
+    // Для отладки: выводим информацию о размере файла в консоль
+    console.log(`📦 Экспорт: файл ${fileName}, размер: ${(blob.size / 1024).toFixed(2)} KB`);
+    console.log(`📊 Содержимое: ${workoutCount} тренировок`);
+    
     // Обновляем метку последнего экспорта
     localStorage.setItem('last_export_date', new Date().toISOString());
   } catch (error) {
