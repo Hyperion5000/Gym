@@ -2806,6 +2806,3 @@ if (!window.__MESO_APP_INITIALIZED__) {
   console.warn('initApp уже был вызван, пропускаем повторный вызов');
 }
 
-// Проверяем напоминание об экспорте через 5 секунд после загрузки
-setTimeout(checkExportReminder, 5000);
-
