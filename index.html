@@ -445,34 +445,69 @@
         });
         
         // Загружаем модули после загрузки SQL.js
-        // Сначала config.js, потом app.js
+        // Сначала config.js, потом app.js (app.js импортирует из config.js)
+        function loadAppJS() {
+          const existingScript = document.querySelector('script[src="./app.js"]');
+          if (!existingScript && !window.__MESO_APP_LOADED__) {
+            window.__MESO_APP_LOADED__ = true;
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = './app.js';
+            
+            // Обработка успешной загрузки
+            script.onload = () => {
+              console.log('✅ app.js загружен успешно');
+            };
+            
+            // Обработка ошибок загрузки
+            script.onerror = (error) => {
+              console.error('❌ Ошибка загрузки app.js:', error);
+              const loading = document.getElementById('loading');
+              if (loading) {
+                loading.innerHTML = `
+                  <div style="text-align: center; max-width: 320px; padding: 24px;">
+                    <div style="margin-bottom: 24px; font-size: 48px;">⚠️</div>
+                    <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки</div>
+                    <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">
+                      Не удалось загрузить приложение. Пожалуйста, обновите страницу.
+                    </div>
+                    <button onclick="location.reload()" style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                      Обновить страницу
+                    </button>
+                  </div>
+                `;
+              }
+            };
+            
+            document.body.appendChild(script);
+          } else {
+            console.warn('app.js уже загружается или загружен, пропускаем повторную загрузку');
+          }
+        }
+        
         const existingConfig = document.querySelector('script[src="./config.js"]');
         if (!existingConfig) {
           const configScript = document.createElement('script');
           configScript.type = 'module';
           configScript.src = './config.js';
-          document.body.appendChild(configScript);
-        }
-        
-        // Проверяем, что модуль app.js еще не загружен
-        const existingScript = document.querySelector('script[src="./app.js"]');
-        if (!existingScript && !window.__MESO_APP_LOADED__) {
-          window.__MESO_APP_LOADED__ = true;
-          const script = document.createElement('script');
-          script.type = 'module';
-          script.src = './app.js';
           
-          // Обработка ошибок загрузки
-          script.onerror = (error) => {
-            console.error('Ошибка загрузки app.js:', error);
+          // Обработка успешной загрузки config.js
+          configScript.onload = () => {
+            console.log('✅ config.js загружен успешно, загружаем app.js...');
+            loadAppJS();
+          };
+          
+          // Обработка ошибок загрузки config.js
+          configScript.onerror = (error) => {
+            console.error('❌ Ошибка загрузки config.js:', error);
             const loading = document.getElementById('loading');
             if (loading) {
               loading.innerHTML = `
                 <div style="text-align: center; max-width: 320px; padding: 24px;">
                   <div style="margin-bottom: 24px; font-size: 48px;">⚠️</div>
-                  <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки</div>
+                  <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки конфигурации</div>
                   <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">
-                    Не удалось загрузить приложение. Пожалуйста, обновите страницу.
+                    Не удалось загрузить конфигурацию приложения. Пожалуйста, обновите страницу.
                   </div>
                   <button onclick="location.reload()" style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
                     Обновить страницу
@@ -482,9 +517,11 @@
             }
           };
           
-          document.body.appendChild(script);
+          document.body.appendChild(configScript);
         } else {
-          console.warn('app.js уже загружается или загружен, пропускаем повторную загрузку');
+          // config.js уже загружен, загружаем app.js
+          console.log('config.js уже загружен, загружаем app.js...');
+          loadAppJS();
         }
       })();
     }
