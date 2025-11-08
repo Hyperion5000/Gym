@@ -605,7 +605,7 @@ async function buildExercises() {
           </div>
         ` : `
           <div class="recommendation-text" style="color: var(--text-muted);">
-            💡 Для аксессуарных упражнений просто введите вес и повторы
+            💡 Для аксессуарных упражнений: ориентируйтесь на <strong>целевой RIR</strong> (см. детали ℹ️) и <strong>диапазон повторов</strong> из плана
           </div>
         `}
         <button class="btn-icon btn-toggle-details" data-exercise="${ex.name}" title="Показать детали">ℹ️</button>
@@ -638,11 +638,13 @@ async function buildExercises() {
           `}
           <div class="detail-item">
             <span class="detail-label">Целевой RIR:</span>
-            <span class="detail-value">${ex.target[week] || '—'}</span>
+            <span class="detail-value" style="font-weight: 600; color: var(--primary);">${ex.target[week] || '—'}</span>
+            ${ex.type !== 'A' ? '<span style="font-size: 0.85em; color: var(--text-muted); margin-left: 8px;">(ориентируйтесь на ощущения)</span>' : ''}
           </div>
           <div class="detail-item">
-            <span class="detail-label">Сеты:</span>
-            <span class="detail-value">${ex.setrep}</span>
+            <span class="detail-label">Сеты и повторы:</span>
+            <span class="detail-value" style="font-weight: 600;">${ex.setrep}</span>
+            ${ex.type !== 'A' ? '<span style="font-size: 0.85em; color: var(--text-muted); margin-left: 8px;">(подбирайте вес под целевой RIR)</span>' : ''}
           </div>
         </div>
       </div>
