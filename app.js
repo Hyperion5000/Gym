@@ -2237,6 +2237,32 @@ async function editSet(id) {
     // Обновляем TM если это упражнение типа A
     await updateTMFromSet(set.exercise, e1);
     
+    // Обновляем карточку упражнения, если она открыта
+    const card = document.querySelector(`.exercise-card[data-exercise="${set.exercise}"]`);
+    if (card) {
+      // Обновляем TM в карточке
+      const tmRow = await dbModule.getOne('SELECT tm_kg FROM tm WHERE exercise = ?', [set.exercise]);
+      if (tmRow?.tm_kg) {
+        card.dataset.tm = tmRow.tm_kg;
+        const tmValue = card.querySelector('.tm-value');
+        if (tmValue) {
+          tmValue.textContent = tmRow.tm_kg;
+          const tmDisplay = card.querySelector('.tm-display');
+          if (tmDisplay) {
+            const bestE1RM = await dbModule.getOne(
+              `SELECT MAX(e1rm) as best_e1rm 
+               FROM tracker 
+               WHERE exercise = ? AND date >= date('now', '-28 days') AND e1rm > 0`,
+              [set.exercise]
+            );
+            const bestE1RMValue = bestE1RM?.best_e1rm || e1;
+            tmDisplay.title = `Тренировочный максимум (90% от лучшего e1RM за 4 недели: ${bestE1RMValue} кг) - авто`;
+          }
+        }
+        computeCard(card);
+      }
+    }
+    
     showNotification('Сет обновлен', 'success');
     await loadHistory();
     await loadDashboard();
