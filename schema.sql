@@ -26,7 +26,9 @@ create table if not exists tm (
   id integer primary key autoincrement,
   exercise text not null unique,
   tm_kg real,
-  updated_at datetime default current_timestamp
+  updated_at datetime default current_timestamp,
+  locked integer default 0,
+  source text default 'auto'
 );
 
 create table if not exists tracker (
