@@ -1196,7 +1196,6 @@ async function buildExercises() {
       }
       }, 100);
     }
-  }
   
   await loadHints();
   await displayProgression();
