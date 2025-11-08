@@ -73,6 +73,7 @@
 
       <!-- Автосохранение активно - кнопка не нужна -->
       <div class="save-section" style="display: none;">
+        <button id="btn-apply-hints" class="btn secondary" style="margin-bottom: 8px;">✨ Применить подсказки</button>
         <button id="btn-save" class="btn primary">💾 Сохранить в БД</button>
       </div>
       
@@ -147,6 +148,32 @@
     </section>
 
     <section id="faq" class="tabpage">
+      <div class="card">
+        <h3>⚙️ Настройки</h3>
+        <div id="settings-panel">
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="setting-auto-tm" checked>
+              <span>Автоматическое обновление TM</span>
+            </label>
+            <p class="setting-description">TM обновляется автоматически на основе качественных сетов</p>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="setting-micro-adjust" checked>
+              <span>Микро-коррекция веса на следующий сет</span>
+            </label>
+            <p class="setting-description">Автоматическая корректировка веса на основе отклонения RIR от цели</p>
+          </div>
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="setting-apply-hints-on-open">
+              <span>Применять подсказки при открытии дня</span>
+            </label>
+            <p class="setting-description">Автоматически заполнять первый сет при открытии дня тренировки</p>
+          </div>
+        </div>
+      </div>
       <div class="card">
         <h3>❓ Часто задаваемые вопросы</h3>
         
@@ -417,8 +444,17 @@
           }
         });
         
-        // Загружаем модуль app.js после загрузки SQL.js
-        // Проверяем, что модуль еще не загружен
+        // Загружаем модули после загрузки SQL.js
+        // Сначала config.js, потом app.js
+        const existingConfig = document.querySelector('script[src="./config.js"]');
+        if (!existingConfig) {
+          const configScript = document.createElement('script');
+          configScript.type = 'module';
+          configScript.src = './config.js';
+          document.body.appendChild(configScript);
+        }
+        
+        // Проверяем, что модуль app.js еще не загружен
         const existingScript = document.querySelector('script[src="./app.js"]');
         if (!existingScript && !window.__MESO_APP_LOADED__) {
           window.__MESO_APP_LOADED__ = true;

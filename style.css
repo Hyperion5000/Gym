@@ -374,6 +374,18 @@ input::placeholder {
   gap: 4px;
 }
 
+.tm-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-sm);
+  font-size: 0.75em;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
 .exercise-name {
   font-size: 18px;
   font-weight: 600;
@@ -654,6 +666,24 @@ ul li:last-child {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+  }
+}
+
+.btn-highlight {
+  background: var(--gradient-primary) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
 }
 
 /* ===== SAFE AREA ===== */
@@ -947,6 +977,36 @@ ul li:last-child {
 }
 
 /* ===== FAQ ===== */
+.setting-item {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.setting-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.setting-description {
+  margin: 4px 0 0 26px;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
 .faq-item {
   margin-bottom: 24px;
   padding-bottom: 24px;

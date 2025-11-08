@@ -477,6 +477,50 @@ async function getOne(sql, params = []) {
   return results.length > 0 ? results[0] : null;
 }
 
+// Батчинг INSERT для множественных строк (оптимизация производительности)
+async function executeBatch(table, columns, rows) {
+  if (!db) await initDatabase();
+  
+  if (!rows || rows.length === 0) {
+    return { success: true, count: 0 };
+  }
+  
+  try {
+    // Создаем один запрос с множественными VALUES
+    const placeholders = columns.map(() => '?').join(', ');
+    const valuesPlaceholders = rows.map(() => `(${placeholders})`).join(', ');
+    const sql = `INSERT INTO ${table} (${columns.join(', ')}) VALUES ${valuesPlaceholders}`;
+    
+    // Собираем все параметры в один массив
+    const params = rows.flatMap(row => columns.map(col => row[col] ?? null));
+    
+    const stmt = db.prepare(sql);
+    try {
+      stmt.bind(params);
+      stmt.step();
+      stmt.free();
+    } catch (bindError) {
+      stmt.free();
+      throw bindError;
+    }
+    
+    await saveDatabase();
+    return { success: true, count: rows.length };
+  } catch (error) {
+    const errorMsg = error.message || String(error);
+    
+    // Игнорируем известные ошибки
+    if (errorMsg.includes('UNIQUE constraint') ||
+        errorMsg.includes('already exists') ||
+        errorMsg.includes('duplicate')) {
+      return { success: true, count: 0, skipped: rows.length };
+    }
+    
+    console.error('Batch execute failed:', error);
+    throw error;
+  }
+}
+
 // Компрессия данных (gzip)
 async function compressData(data) {
   try {
@@ -759,6 +803,7 @@ export {
   query,
   execute,
   getOne,
+  executeBatch,
   exportDatabase,
   importDatabase,
   loadCSVIntoTable,
