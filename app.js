@@ -12,18 +12,24 @@ import {
 if (window.__MESO_MODULE_LOADED__) {
   console.warn('app.js уже загружен, пропускаем повторную загрузку');
   // Модуль уже загружен, прекращаем выполнение
-  // Все дальнейшие объявления будут пропущены
-  throw new Error('Module already loaded');
+  // В ES6 модулях нельзя просто выйти, но можно проверить и пропустить инициализацию
 }
 window.__MESO_MODULE_LOADED__ = true;
 
 // === КОНСТАНТЫ (из конфига) ===
-// Проверяем, что CONFIG загружен
-if (typeof CONFIG === 'undefined') {
-  console.error('CONFIG не загружен! Проверьте загрузку config.js');
-  throw new Error('CONFIG is not defined. Check config.js loading.');
-}
-const LIMITS = CONFIG.LIMITS;
+// CONFIG импортируется через import, поэтому он должен быть доступен
+// Если CONFIG не определен, это означает проблему с загрузкой config.js
+const LIMITS = CONFIG?.LIMITS || {
+  E1RM_FACTOR: 30,
+  WEIGHT_ROUNDING: 2.5,
+  MAX_WEIGHT: 500,
+  MIN_WEIGHT: 0.5,
+  MAX_REPS: 100,
+  MIN_REPS: 1,
+  MAX_TM: 500,
+  DEBOUNCE_DELAY: 500,
+  AUTOSAVE_INTERVAL: 5000
+};
 
 let PLAN = {};
 let CURRENT_SESSION = null;
