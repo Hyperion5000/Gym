@@ -1,12 +1,16 @@
 // === MESO App (SQL.js) ===
-// Защита от повторного выполнения модуля
+import * as dbModule from './db.js';
+
+// Защита от повторного выполнения модуля (после импорта)
 if (window.__MESO_MODULE_LOADED__) {
   console.warn('app.js уже загружен, пропускаем повторную загрузку');
-  throw new Error('Module already loaded');
+  // Не выбрасываем ошибку, просто выходим
+  if (typeof window !== 'undefined') {
+    // Модуль уже загружен, ничего не делаем
+    export {};
+  }
 }
 window.__MESO_MODULE_LOADED__ = true;
-
-import * as dbModule from './db.js';
 
 // === КОНСТАНТЫ ===
 const LIMITS = {
