@@ -479,7 +479,19 @@
               }
             };
             
-            document.body.appendChild(script);
+            try {
+              if (document.body) {
+                document.body.appendChild(script);
+              } else {
+                console.error('document.body не доступен');
+                window.addEventListener('DOMContentLoaded', () => {
+                  document.body.appendChild(script);
+                });
+              }
+            } catch (e) {
+              console.error('Ошибка при appendChild:', e);
+              throw e;
+            }
           } else {
             console.warn('app.js уже загружается или загружен, пропускаем повторную загрузку');
           }
