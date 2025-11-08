@@ -64,8 +64,8 @@ function rpeFromRir(rir) {
 
 // Округление до стандартных блинов (1.25, 2.5, 5 кг)
 // Защита от дублирования функции при повторной загрузке модуля
-if (typeof roundToStandardPlates === 'undefined') {
-  window.roundToStandardPlates = function roundToStandardPlates(weight) {
+if (typeof window.roundToStandardPlates === 'undefined') {
+  window.roundToStandardPlates = function(weight) {
     if (!weight || weight <= 0) return 0;
     
     // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
@@ -98,8 +98,8 @@ if (typeof roundToStandardPlates === 'undefined') {
   };
 }
 
-// Создаем локальную ссылку для использования в модуле
-const roundToStandardPlates = window.roundToStandardPlates;
+// Используем функцию из window для избежания конфликтов модулей
+const roundToStandardPlates = (weight) => window.roundToStandardPlates(weight);
 
 // Обратная функция: расчет веса по ТМ, целевому RIR и повторам
 function weightFromRIR(tm, targetRIR, reps) {
