@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meso-cache-v7';
+const CACHE_NAME = 'meso-cache-v8';
 const ASSETS = [
   './',
   './index.html',
@@ -25,7 +25,17 @@ self.addEventListener('activate', (e) => {
           .filter(name => name !== CACHE_NAME)
           .map(name => caches.delete(name))
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      // Принудительно обновляем все клиенты
+      return self.clients.claim().then(() => {
+        // Отправляем сообщение всем клиентам для обновления
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'SW_UPDATED', cacheName: CACHE_NAME });
+          });
+        });
+      });
+    })
   );
 });
 
