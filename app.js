@@ -4,11 +4,8 @@ import * as dbModule from './db.js';
 // Защита от повторного выполнения модуля (после импорта)
 if (window.__MESO_MODULE_LOADED__) {
   console.warn('app.js уже загружен, пропускаем повторную загрузку');
-  // Не выбрасываем ошибку, просто выходим
-  if (typeof window !== 'undefined') {
-    // Модуль уже загружен, ничего не делаем
-    export {};
-  }
+  // Модуль уже загружен, прекращаем выполнение
+  // Все дальнейшие объявления будут пропущены
 }
 window.__MESO_MODULE_LOADED__ = true;
 
@@ -2801,8 +2798,10 @@ if (!window.__MESO_APP_INITIALIZED__) {
   window.__MESO_APP_INITIALIZED__ = true;
   setupOnlineIndicator();
   initTheme();
-  initExportReminder();
   initApp();
+  
+  // Проверяем напоминание об экспорте через 5 секунд после загрузки
+  setTimeout(checkExportReminder, 5000);
 } else {
   console.warn('initApp уже был вызван, пропускаем повторный вызов');
 }
