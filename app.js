@@ -382,6 +382,21 @@ async function updateTMAfterCycle() {
     let updatedCount = 0;
     
     for (const exercise of allExercises) {
+      // Проверяем тип упражнения - обновляем ТМ только для типа A
+      let exerciseType = null;
+      for (const day of Object.keys(PLAN)) {
+        const found = PLAN[day].find(ex => ex.name === exercise);
+        if (found) {
+          exerciseType = found.type;
+          break;
+        }
+      }
+      
+      // Обновляем ТМ только для типа A
+      if (exerciseType !== 'A') {
+        continue;
+      }
+      
       // Лучший e1RM ТОЛЬКО из недели 3 за последние 7 дней
       const best = await dbModule.getOne(
         `SELECT MAX(e1rm) as best_e1rm 
@@ -436,11 +451,26 @@ async function resetCycle() {
   }
 }
 
-// Автоматическое обновление ТМ после сохранения сета (для первой недели)
+// Автоматическое обновление ТМ после сохранения сета (только для типа A)
 async function updateTMFromSet(exercise, e1rm) {
   if (!exercise || !e1rm || e1rm <= 0) return;
   
   try {
+    // Проверяем тип упражнения - ТМ только для типа A
+    let exerciseType = null;
+    for (const day of Object.keys(PLAN)) {
+      const found = PLAN[day].find(ex => ex.name === exercise);
+      if (found) {
+        exerciseType = found.type;
+        break;
+      }
+    }
+    
+    // Обновляем ТМ только для типа A
+    if (exerciseType !== 'A') {
+      return;
+    }
+    
     // Проверяем, есть ли уже ТМ для этого упражнения
     const existingTM = await dbModule.getOne(
       'SELECT tm_kg FROM tm WHERE exercise = ?',
@@ -533,7 +563,8 @@ async function buildExercises() {
     
     // O(1) lookup вместо await запроса к БД
     let tm = tmMap[ex.name];
-    if (!tm) {
+    // Автоматический расчет ТМ только для типа A
+    if (!tm && ex.type === 'A') {
       tm = await getAutoTM(ex.name);
     }
     
@@ -544,10 +575,10 @@ async function buildExercises() {
     card.dataset.target = ex.target[week] || '';
     card.dataset.tm = tm || 0;
     
-    // Рассчитываем рекомендацию
+    // Рассчитываем рекомендацию только для типа A
     const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(ex.setrep);
     const targetReps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
-    const recommendedWeight = tm > 0 ? getRecommendedWeight(tm, Number(week), targetReps) : null;
+    const recommendedWeight = (ex.type === 'A' && tm > 0) ? getRecommendedWeight(tm, Number(week), targetReps) : null;
     
     // Получаем последний результат для истории
     const lastResult = lastSet ? `${lastSet.weight} кг × ${lastSet.reps}` : 'Нет данных';
@@ -568,9 +599,13 @@ async function buildExercises() {
           <button class="btn btn-use-recommendation" data-exercise="${ex.name}" title="Использовать рекомендацию">
             Использовать рекомендацию
           </button>
-        ` : `
+        ` : ex.type === 'A' ? `
           <div class="recommendation-text" style="color: var(--text-muted);">
             Укажите базовый вес для получения рекомендаций
+          </div>
+        ` : `
+          <div class="recommendation-text" style="color: var(--text-muted);">
+            💡 Для аксессуарных упражнений просто введите вес и повторы
           </div>
         `}
         <button class="btn-icon btn-toggle-details" data-exercise="${ex.name}" title="Показать детали">ℹ️</button>
@@ -581,6 +616,7 @@ async function buildExercises() {
             <span class="detail-label">Прошлый результат:</span>
             <span class="detail-value">${lastResult}</span>
           </div>
+          ${ex.type === 'A' ? `
           <div class="detail-item">
             <span class="detail-label">Целевой максимум:</span>
             <span class="detail-value">
@@ -591,6 +627,14 @@ async function buildExercises() {
               <input class="tm-input hidden" type="text" inputmode="decimal" placeholder="0" value="${tm || ''}" style="width: 80px; padding: 4px 8px; font-size: 14px;">
             </span>
           </div>
+          ` : `
+          <div class="detail-item">
+            <span class="detail-label">Тренировочный максимум:</span>
+            <span class="detail-value" style="color: var(--text-muted);">
+              Не требуется для аксессуарных упражнений
+            </span>
+          </div>
+          `}
           <div class="detail-item">
             <span class="detail-label">Целевой RIR:</span>
             <span class="detail-value">${ex.target[week] || '—'}</span>
@@ -742,9 +786,25 @@ async function loadLastTM(exercise) {
   }
 }
 
-// Сохранение ТМ для упражнения
+// Сохранение ТМ для упражнения (только для типа A)
 async function saveTM(exercise, tm) {
   if (!tm || tm <= 0) return;
+  
+  // Проверяем тип упражнения - сохраняем ТМ только для типа A
+  let exerciseType = null;
+  for (const day of Object.keys(PLAN)) {
+    const found = PLAN[day].find(ex => ex.name === exercise);
+    if (found) {
+      exerciseType = found.type;
+      break;
+    }
+  }
+  
+  if (exerciseType !== 'A') {
+    console.warn(`ТМ не сохраняется для упражнения ${exercise}: требуется тип A, получен ${exerciseType}`);
+    return;
+  }
+  
   try {
     await dbModule.execute(
       'INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
@@ -1182,6 +1242,17 @@ function initGlobalHandlers() {
     const value = Number(normalizeNumber(inp.value || 0));
     
     if (inp.classList.contains('tm-input')) {
+      // Проверяем тип упражнения - ТМ только для типа A
+      const ex = Object.values(PLAN).flat().find(e => e.name === exName);
+      if (!ex || ex.type !== 'A') {
+        // Для аксессуаров не сохраняем ТМ
+        inp.classList.add('hidden');
+        inp.style.display = 'none';
+        const tmDisplay = card.querySelector('.tm-display');
+        if (tmDisplay) tmDisplay.style.display = 'inline-block';
+        return;
+      }
+      
       // Скрываем поле ввода ТМ и показываем значение
       const tmDisplay = card.querySelector('.tm-display');
       const tmValue = card.querySelector('.tm-value');
@@ -1202,7 +1273,6 @@ function initGlobalHandlers() {
         
         // Обновляем рекомендацию после изменения ТМ
         const week = Number((DOM.week || $("#week")).value);
-        const ex = Object.values(PLAN).flat().find(e => e.name === exName);
         if (ex) {
           const repMatch = /(?:×|x)(\d+)[–-](\d+)/i.exec(ex.setrep);
           const targetReps = repMatch ? Math.round((Number(repMatch[1]) + Number(repMatch[2])) / 2) : 8;
@@ -2147,10 +2217,13 @@ async function showOnboarding() {
         Для начала работы нужно указать базовые веса для упражнений.
       </p>
       <p style="margin-bottom: 24px; color: var(--text-muted);">
-        <strong>Вопрос:</strong> Какой вес вы можете поднять на 5-8 повторов с хорошей техникой?
+        <strong>Важно:</strong> Тренировочный максимум (ТМ) требуется только для основных упражнений типа <strong>A</strong> (присед, жим, тяга).
       </p>
       <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9em;">
-        💡 <strong>Не знаете точный вес?</strong> Введите примерный вес и количество повторов, которые вы можете сделать с этим весом. Приложение автоматически рассчитает ваш тренировочный максимум (ТМ).
+        💡 <strong>Для упражнений типа A:</strong> Введите вес и количество повторов (например, 80кг × 6 повторов), которые вы можете сделать с хорошей техникой. Приложение автоматически рассчитает ваш ТМ.
+      </p>
+      <p style="margin-bottom: 16px; color: var(--text-muted); font-size: 0.9em;">
+        💡 <strong>Для аксессуарных упражнений (типы B, C, D):</strong> ТМ не требуется. Просто вводите вес и повторы во время тренировки.
       </p>
       <div id="onboarding-exercises" class="onboarding-exercises"></div>
       <div class="onboarding-actions">
@@ -2174,18 +2247,30 @@ async function showOnboarding() {
   allExercises.forEach(ex => {
     const exerciseItem = document.createElement('div');
     exerciseItem.className = 'onboarding-exercise-item';
-    exerciseItem.innerHTML = `
-      <label>${ex.name}</label>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1;">
-        <span style="color: var(--text-muted);">×</span>
-        <input type="number" step="1" min="1" max="20" placeholder="5-8" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
-        <span style="color: var(--text-muted); font-size: 0.9em;">повт.</span>
-      </div>
-      <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
-        Пример: если можете сделать 80кг × 6 повторов, введите 80 и 6
-      </div>
-    `;
+    
+    // Только для типа A показываем поля для ТМ
+    if (ex.type === 'A') {
+      exerciseItem.innerHTML = `
+        <label>${ex.name} <span style="color: var(--text-muted); font-size: 0.85em;">(тип A - требуется ТМ)</span></label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1;">
+          <span style="color: var(--text-muted);">×</span>
+          <input type="number" step="1" min="1" max="20" placeholder="5-8" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
+          <span style="color: var(--text-muted); font-size: 0.9em;">повт.</span>
+        </div>
+        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">
+          Пример: если можете сделать 80кг × 6 повторов, введите 80 и 6. ТМ будет рассчитан автоматически.
+        </div>
+      `;
+    } else {
+      // Для типов B, C, D не требуем ТМ
+      exerciseItem.innerHTML = `
+        <label>${ex.name} <span style="color: var(--text-muted); font-size: 0.85em;">(тип ${ex.type} - ТМ не требуется)</span></label>
+        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px; padding: 8px; background: var(--card-bg); border-radius: 4px;">
+          💡 Для аксессуарных упражнений ТМ не требуется. Просто вводите вес и повторы во время тренировки.
+        </div>
+      `;
+    }
     exercisesContainer.appendChild(exerciseItem);
   });
   
@@ -2220,9 +2305,20 @@ async function saveOnboardingWeights() {
     }
   }
   
-  // Рассчитываем ТМ для каждого упражнения
+  // Рассчитываем ТМ только для упражнений типа A
   for (const [exercise, data] of Object.entries(exerciseData)) {
-    if (data.weight > 0) {
+    // Находим тип упражнения
+    let exerciseType = null;
+    for (const day of Object.keys(PLAN)) {
+      const found = PLAN[day].find(ex => ex.name === exercise);
+      if (found) {
+        exerciseType = found.type;
+        break;
+      }
+    }
+    
+    // Сохраняем ТМ только для типа A
+    if (exerciseType === 'A' && data.weight > 0) {
       // Используем введенные повторы, или 6.5 по умолчанию
       const reps = data.reps && data.reps > 0 ? data.reps : 6.5;
       
