@@ -93,10 +93,20 @@ async function saveDatabase() {
     const data = db.export();
     const idb = await openIDB();
     const tx = idb.transaction(IDB_STORE, 'readwrite');
-    await tx.objectStore(IDB_STORE).put(data, 'main');
-    await tx.complete;
+    const store = tx.objectStore(IDB_STORE);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.put(data, 'main');
+      request.onsuccess = () => {
+        // Ждем завершения транзакции
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
   } catch (error) {
     console.error('Failed to save database:', error);
+    throw error;
   }
 }
 
@@ -105,8 +115,16 @@ async function loadDatabase() {
   try {
     const idb = await openIDB();
     const tx = idb.transaction(IDB_STORE, 'readonly');
-    const data = await tx.objectStore(IDB_STORE).get('main');
-    return data;
+    const store = tx.objectStore(IDB_STORE);
+    
+    return new Promise((resolve, reject) => {
+      const request = store.get('main');
+      request.onsuccess = () => {
+        tx.oncomplete = () => resolve(request.result);
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
   } catch (error) {
     console.error('Failed to load database:', error);
     return null;
@@ -555,12 +573,19 @@ async function executeBatch(table, columns, rows) {
 async function compressData(data) {
   try {
     // Используем CompressionStream API (современные браузеры)
-    if ('CompressionStream' in window) {
-      const stream = new Blob([data]).stream();
-      const compressedStream = stream.pipeThrough(new CompressionStream('gzip'));
-      const compressedBlob = await new Response(compressedStream).blob();
-      const arrayBuffer = await compressedBlob.arrayBuffer();
-      return new Uint8Array(arrayBuffer);
+    // CompressionStream поддерживается с iOS 16.4+, Blob.stream() с iOS 15+
+    if ('CompressionStream' in window && typeof Blob.prototype.stream === 'function') {
+      try {
+        const stream = new Blob([data]).stream();
+        const compressedStream = stream.pipeThrough(new CompressionStream('gzip'));
+        const compressedBlob = await new Response(compressedStream).blob();
+        const arrayBuffer = await compressedBlob.arrayBuffer();
+        return new Uint8Array(arrayBuffer);
+      } catch (streamError) {
+        // Если stream() не поддерживается, используем фолбэк
+        console.warn('Blob.stream() not supported, using uncompressed data');
+        return new TextEncoder().encode(data);
+      }
     } else {
       // Fallback: без компрессии
       return new TextEncoder().encode(data);
@@ -574,11 +599,18 @@ async function compressData(data) {
 // Декомпрессия данных
 async function decompressData(compressedData) {
   try {
-    if ('DecompressionStream' in window) {
-      const stream = new Blob([compressedData]).stream();
-      const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
-      const decompressedBlob = await new Response(decompressedStream).blob();
-      return await decompressedBlob.text();
+    // DecompressionStream поддерживается с iOS 16.4+, Blob.stream() с iOS 15+
+    if ('DecompressionStream' in window && typeof Blob.prototype.stream === 'function') {
+      try {
+        const stream = new Blob([compressedData]).stream();
+        const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'));
+        const decompressedBlob = await new Response(decompressedStream).blob();
+        return await decompressedBlob.text();
+      } catch (streamError) {
+        // Если stream() не поддерживается, используем фолбэк
+        console.warn('Blob.stream() not supported, trying as plain text');
+        return new TextDecoder().decode(compressedData);
+      }
     } else {
       // Fallback: данные не сжаты
       return new TextDecoder().decode(compressedData);

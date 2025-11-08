@@ -21,7 +21,6 @@
     <nav class="tabs">
       <button data-tab="train" class="tab active">🏋️ Тренировка</button>
       <button data-tab="history" class="tab">📜 История</button>
-      <button data-tab="dash" class="tab">📊 Дашборд</button>
       <button data-tab="prs" class="tab">🏆 Рекорды</button>
       <button data-tab="faq" class="tab">❓ FAQ</button>
     </nav>
@@ -83,40 +82,6 @@
 
       <div class="card small">
         <b>Подсказки:</b> вводишь только <i>вес</i> и <i>повторы</i>. Остальное считается автоматически.
-      </div>
-    </section>
-
-    <section id="dash" class="tabpage">
-      <div class="card">
-        <h3>Дашборд</h3>
-        <div id="metrics" class="metrics">
-          <div class="metric">
-            <div class="label">Тоннаж (неделя)</div>
-            <div id="m-tonnage" class="value">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Повторы (неделя)</div>
-            <div id="m-reps" class="value">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Сеты (неделя)</div>
-            <div id="m-sets" class="value">—</div>
-          </div>
-          <div class="metric">
-            <div class="label">Попадание в RIR</div>
-            <div id="m-rir" class="value">—</div>
-          </div>
-        </div>
-        <div class="row gap">
-          <div class="card sub">
-            <div class="sub-title">Лучшие e1RM</div>
-            <ul id="best-e1rm"></ul>
-          </div>
-          <div class="card sub">
-            <div class="sub-title">По типам A/B/C/D</div>
-            <ul id="by-type"></ul>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -265,7 +230,6 @@
           <ul>
             <li>Тренировка помечается как завершенная</li>
             <li>Сохраняется статистика (количество сетов, тоннаж)</li>
-            <li>Данные учитываются в дашборде</li>
           </ul>
         </div>
 
@@ -303,16 +267,10 @@
 
         <div class="faq-item">
           <h4>Что происходит при первом запуске приложения?</h4>
-          <p>При первом запуске приложение покажет экран онбординга.</p>
+          <p>При первом запуске приложение автоматически создаст базу данных и загрузит план тренировок. Вы можете сразу начать тренировку.</p>
           <p><strong>Важно:</strong> ТМ требуется <strong>только для упражнений типа A</strong> (присед, жим, тяга). Для аксессуарных упражнений (типы B, C, D) ТМ не требуется — просто вводите вес и повторы во время тренировки.</p>
-          <p><strong>Для упражнений типа A:</strong> Вам не нужно знать точный тренировочный максимум (ТМ)! Просто введите:</p>
-          <ul>
-            <li><strong>Вес</strong> — какой вес вы можете поднять (например, 80кг)</li>
-            <li><strong>Повторы</strong> — сколько повторов вы можете сделать с этим весом (например, 6 повторов)</li>
-          </ul>
-          <p>Приложение автоматически рассчитает ваш e1RM и ТМ на основе введенных данных. Например, если вы введете 80кг × 6 повторов, приложение рассчитает e1RM ≈ 96кг и ТМ ≈ 86.4кг.</p>
-          <p><strong>Для аксессуарных упражнений (типы B, C, D):</strong> Поля для ввода веса и повторов не показываются в онбординге. Просто вводите вес и повторы во время тренировки — ТМ не требуется.</p>
-          <p><strong>Совет:</strong> Не обязательно заполнять все упражнения типа A сразу. Можно указать только те, которые вы знаете, и добавить остальные позже.</p>
+          <p><strong>Для упражнений типа A:</strong> ТМ рассчитывается автоматически при первом сохранении сета. Вам не нужно знать точный тренировочный максимум заранее — просто введите вес и повторы, и приложение рассчитает ТМ автоматически.</p>
+          <p><strong>Для аксессуарных упражнений (типы B, C, D):</strong> Просто вводите вес и повторы во время тренировки — ТМ не требуется.</p>
         </div>
 
         <div class="faq-item">
@@ -320,7 +278,7 @@
           <p>Если вы хотите сбросить все базовые веса и начать новый цикл с нуля:</p>
           <button id="btn-reset-cycle" class="btn danger" style="margin-top: 12px;">Начать цикл заново</button>
           <p style="margin-top: 12px; color: var(--text-muted); font-size: 14px;">
-            <strong>Внимание:</strong> Это действие удалит все базовые веса. После сброса вам нужно будет указать их заново через онбординг.
+            <strong>Внимание:</strong> Это действие удалит все базовые веса. После сброса TM будет рассчитан автоматически при следующем сохранении сета.
           </p>
         </div>
       </div>
@@ -336,10 +294,6 @@
     <button data-tab="history" class="tab">
       <span class="tab-icon">📜</span>
       <span>История</span>
-    </button>
-    <button data-tab="dash" class="tab">
-      <span class="tab-icon">📊</span>
-      <span>Дашборд</span>
     </button>
     <button data-tab="prs" class="tab">
       <span class="tab-icon">🏆</span>

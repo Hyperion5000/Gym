@@ -28,7 +28,8 @@ const LIMITS = (CONFIG && CONFIG.LIMITS) ? CONFIG.LIMITS : {
   MIN_REPS: 1,
   MAX_TM: 500,
   DEBOUNCE_DELAY: 500,
-  AUTOSAVE_INTERVAL: 5000
+  AUTOSAVE_INTERVAL: 5000,
+  NOTIFICATION_DURATION: 3000
 };
 
 let PLAN = {};
@@ -229,7 +230,7 @@ const validateTM = (tm) => validateNumber(tm, {
 });
 
 // Показать уведомление
-function showNotification(message, type = 'info') {
+function showNotification(message, type = 'info', duration = null) {
   const notification = document.createElement('div');
   notification.className = `notification notification-${type}`;
   notification.textContent = message;
@@ -239,10 +240,11 @@ function showNotification(message, type = 'info') {
     notification.classList.add('show');
   }, 10);
   
+  const displayDuration = duration !== null ? duration : (LIMITS.NOTIFICATION_DURATION || 3000);
   setTimeout(() => {
     notification.classList.remove('show');
     setTimeout(() => notification.remove(), 300);
-  }, LIMITS.NOTIFICATION_DURATION);
+  }, displayDuration);
 }
 
 // Загрузка плана тренировок
@@ -517,7 +519,7 @@ async function resetCycle() {
   
   try {
     await dbModule.execute('DELETE FROM tm');
-    showNotification('Все базовые веса сброшены. Запустите онбординг заново.', 'success');
+    showNotification('Все базовые веса сброшены. TM будет рассчитан автоматически при следующем сохранении сета.', 'success');
     
     // Перезагружаем упражнения
     await buildExercises();
@@ -1116,12 +1118,6 @@ async function buildExercises() {
         </div>
       </div>
       <button class="btn-add-set">+ Добавить сет</button>
-      ${ex.type === 'A' ? `
-        <div class="exercise-actions" style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
-          <button class="btn btn-small btn-warmup" data-exercise="${ex.name}" title="Добавить разминку">🔥 Разминка</button>
-          <button class="btn btn-small btn-backoff" data-exercise="${ex.name}" title="Добавить бэкофф-сеты">📉 Бэкофф</button>
-        </div>
-      ` : ''}
       <div class="exercise-e1rm" style="margin-top: 8px; font-size: 14px; color: var(--color-primary); display: none;">
         💪 Макс e1RM: <strong class="e1rm-max">—</strong> кг
       </div>
@@ -1807,20 +1803,6 @@ function initGlobalHandlers() {
           showNotification(`Рекомендация применена: ${weight} кг × ${reps}`, 'success');
         }
       }
-    }
-    
-    // Обработчик "Разминка"
-    if (e.target.classList.contains('btn-warmup') || e.target.closest('.btn-warmup')) {
-      const btn = e.target.closest('.btn-warmup');
-      const exerciseName = btn.dataset.exercise;
-      generateWarmupSets(exerciseName);
-    }
-    
-    // Обработчик "Бэкофф"
-    if (e.target.classList.contains('btn-backoff') || e.target.closest('.btn-backoff')) {
-      const btn = e.target.closest('.btn-backoff');
-      const exerciseName = btn.dataset.exercise;
-      generateBackoffSets(exerciseName);
     }
   });
   
@@ -2800,164 +2782,6 @@ async function loadChartJS() {
 //   // теперь можно рисовать графики
 // }
 
-// Тепловая карта тренировок
-async function renderHeatmap() {
-  try {
-    const data = await dbModule.query(`
-      SELECT date, COUNT(DISTINCT exercise) as exercises_count, SUM(CASE WHEN weight > 0 AND reps > 0 THEN 1 ELSE 0 END) as sets_count
-      FROM tracker 
-      WHERE date >= date('now', '-90 days')
-      GROUP BY date
-      ORDER BY date
-    `);
-    
-    const heatmapContainer = document.getElementById('heatmap-container');
-    if (!heatmapContainer) return;
-    
-    const heatmap = document.createElement('div');
-    heatmap.className = 'heatmap';
-    
-    // Генерируем 91 день (13 недель)
-    const today = new Date();
-    for (let i = 90; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().slice(0, 10);
-      
-      const dayData = data.find(d => d.date === dateStr);
-      const intensity = dayData ? Math.min(dayData.sets_count / 20, 1) : 0;
-      
-      const cell = document.createElement('div');
-      cell.className = 'heatmap-cell';
-      if (intensity > 0) cell.classList.add('active');
-      cell.style.opacity = intensity || 0.1;
-      cell.title = `${dateStr}: ${(dayData && dayData.sets_count) ? dayData.sets_count : 0} сетов, ${(dayData && dayData.exercises_count) ? dayData.exercises_count : 0} упражнений`;
-      heatmap.appendChild(cell);
-    }
-    
-    heatmapContainer.innerHTML = '<h4>📅 Активность за 90 дней</h4>';
-    heatmapContainer.appendChild(heatmap);
-    
-    const legend = document.createElement('div');
-    legend.className = 'heatmap-legend';
-    legend.innerHTML = '<span>Меньше</span><span>Больше тренировок</span>';
-    heatmapContainer.appendChild(legend);
-  } catch (error) {
-    console.warn('Failed to render heatmap:', error);
-  }
-}
-
-// Дашборд
-async function loadDashboard() {
-  const week = Number((DOM.week || $("#week")).value);
-  
-  try {
-    const vol = await dbModule.getOne(
-      'SELECT * FROM v_weekly_volume WHERE week = ?',
-      [week]
-    );
-    
-    $("#m-tonnage").textContent = (vol && vol.tonnage != null) ? vol.tonnage : '—';
-    $("#m-reps").textContent = (vol && vol.reps != null) ? vol.reps : '—';
-    $("#m-sets").textContent = (vol && vol.sets != null) ? vol.sets : '—';
-    $("#m-rir").textContent = (vol && vol.avg_rir_diff != null) ?
-      (Math.round(vol.avg_rir_diff * 10) / 10) : '—';
-    
-    const byType = [
-      ['A', (vol && vol.a_sets != null) ? vol.a_sets : 0],
-      ['B', (vol && vol.b_sets != null) ? vol.b_sets : 0],
-      ['C', (vol && vol.c_sets != null) ? vol.c_sets : 0],
-      ['D', (vol && vol.d_sets != null) ? vol.d_sets : 0]
-    ];
-    
-    const ul = $("#by-type");
-    ul.innerHTML = '';
-    byType.forEach(([t, v]) => {
-      const li = document.createElement('li');
-      li.textContent = `Тип ${t}: ${v} сетов`;
-      ul.appendChild(li);
-    });
-    
-    const best = await dbModule.query('SELECT * FROM v_best_e1rm');
-    const ul2 = $("#best-e1rm");
-    ul2.innerHTML = '';
-    (best || []).forEach(x => {
-      const li = document.createElement('li');
-      li.textContent = `${x.exercise}: ${x.best_e1rm} кг (${x.date})`;
-      ul2.appendChild(li);
-    });
-    
-    // Загружаем историю ТМ
-    await loadTMHistory();
-    
-    // Загружаем тепловую карту
-    await renderHeatmap();
-  } catch (error) {
-    console.error('Failed to load dashboard:', error);
-  }
-}
-
-// Загрузка истории ТМ для дашборда
-async function loadTMHistory() {
-  try {
-    // Проверяем существование таблицы tm_log
-    const tableCheck = await dbModule.query(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name='tm_log'`
-    );
-    
-    if (!tableCheck || tableCheck.length === 0) {
-      return; // Таблица еще не создана
-    }
-    
-    // Получаем последние обновления ТМ (по одному на упражнение)
-    const tmHistory = await dbModule.query(`
-      SELECT exercise, tm_kg, updated_at, note
-      FROM tm_log
-      WHERE id IN (
-        SELECT MAX(id) 
-        FROM tm_log 
-        GROUP BY exercise
-      )
-      ORDER BY updated_at DESC
-      LIMIT 10
-    `);
-    
-    // Добавляем мини-спарклайн истории ТМ в дашборд
-    const dashboardCard = document.querySelector('#dash .card');
-    if (dashboardCard && tmHistory && tmHistory.length > 0) {
-      // Удаляем предыдущий блок истории ТМ если есть
-      const oldBlock = document.getElementById('tm-history-block');
-      if (oldBlock) oldBlock.remove();
-      
-      const tmBlock = document.createElement('div');
-      tmBlock.id = 'tm-history-block';
-      tmBlock.className = 'card sub';
-      tmBlock.style.marginTop = '16px';
-      tmBlock.innerHTML = `
-        <div class="sub-title">📈 История ТМ (последние обновления)</div>
-        <ul id="tm-history-list"></ul>
-      `;
-      
-      dashboardCard.appendChild(tmBlock);
-      
-      const tmList = document.getElementById('tm-history-list');
-      tmHistory.forEach(item => {
-        const li = document.createElement('li');
-        const date = new Date(item.updated_at).toLocaleDateString('ru-RU', { 
-          day: '2-digit', 
-          month: '2-digit' 
-        });
-        li.textContent = `${item.exercise}: ${item.tm_kg} кг (${date})`;
-        if (item.note) {
-          li.title = item.note;
-        }
-        tmList.appendChild(li);
-      });
-    }
-  } catch (error) {
-    console.warn('Failed to load TM history:', error);
-  }
-}
 
 // Рекорды с фильтром ложных PR (только при близком RIR)
 async function loadPRs() {
@@ -3124,7 +2948,6 @@ function displayHistory(data) {
           );
           showNotification('Данные удалены', 'success');
           await loadHistory();
-          await loadDashboard();
           await loadPRs();
         } catch (error) {
           console.error('Failed to delete:', error);
@@ -3144,7 +2967,6 @@ function displayHistory(data) {
           await dbModule.execute('DELETE FROM tracker WHERE id = ?', [id]);
           showNotification('Сет удален', 'success');
           await loadHistory();
-          await loadDashboard();
           await loadPRs();
         } catch (error) {
           console.error('Failed to delete set:', error);
@@ -3246,7 +3068,6 @@ async function editSet(id) {
     
     showNotification('Сет обновлен', 'success');
     await loadHistory();
-    await loadDashboard();
     await loadPRs();
   } catch (error) {
     console.error('Failed to edit set:', error);
@@ -3481,203 +3302,6 @@ function updateProgress(percent, status) {
   }
 }
 
-// Проверка первого запуска
-async function checkFirstLaunch() {
-  try {
-    // Проверяем наличие данных в tracker или sessions - если есть, значит не первый запуск
-    const trackerData = await dbModule.query('SELECT COUNT(*) as count FROM tracker');
-    const sessionsData = await dbModule.query('SELECT COUNT(*) as count FROM sessions');
-    
-    const hasTrackerData = trackerData && trackerData.length > 0 && trackerData[0].count > 0;
-    const hasSessionsData = sessionsData && sessionsData.length > 0 && sessionsData[0].count > 0;
-    
-    // Если есть данные в tracker или sessions, значит не первый запуск (даже если нет ТМ)
-    if (hasTrackerData || hasSessionsData) {
-      return false;
-    }
-    
-    // Если нет данных в tracker/sessions, проверяем ТМ
-    const tmData = await dbModule.query('SELECT COUNT(*) as count FROM tm WHERE tm_kg IS NOT NULL AND tm_kg > 0');
-    return !tmData || tmData.length === 0 || tmData[0].count === 0;
-  } catch (error) {
-    console.warn('Failed to check first launch:', error);
-    return true; // В случае ошибки считаем первым запуском
-  }
-}
-
-// Показ онбординга
-async function showOnboarding() {
-  // Скрываем основной интерфейс
-  document.querySelector('main').style.display = 'none';
-  document.querySelector('header').style.display = 'none';
-  const bottomNav = document.querySelector('.bottom-nav');
-  if (bottomNav) bottomNav.style.setProperty('display', 'none');
-  
-  // Создаем экран онбординга
-  const onboarding = document.createElement('div');
-  onboarding.className = 'onboarding-screen';
-  onboarding.innerHTML = `
-    <div class="onboarding-content">
-      <h2>Добро пожаловать в MESO!</h2>
-      <p style="margin: 16px 0 24px 0; color: var(--text-muted); line-height: 1.6;">
-        Укажите базовые веса для <strong>основных упражнений типа A</strong> (присед, жим, тяга).<br>
-        Для аксессуарных упражнений (B, C, D) веса можно указать позже во время тренировки.
-      </p>
-      <div id="onboarding-exercises" class="onboarding-exercises"></div>
-      <div class="onboarding-actions">
-        <button id="onboarding-save" class="btn primary">Сохранить и начать</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(onboarding);
-  
-  // Загружаем все упражнения из плана
-  const allExercises = [];
-  for (const day of Object.keys(PLAN)) {
-    for (const ex of PLAN[day]) {
-      if (!allExercises.find(e => e.name === ex.name)) {
-        allExercises.push(ex);
-      }
-    }
-  }
-  
-  const exercisesContainer = document.getElementById('onboarding-exercises');
-  allExercises.forEach(ex => {
-    const exerciseItem = document.createElement('div');
-    exerciseItem.className = 'onboarding-exercise-item';
-    
-    // Только для типа A показываем поля для ТМ
-    if (ex.type === 'A') {
-      exerciseItem.innerHTML = `
-        <label>${ex.name}</label>
-        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-          <input type="number" step="0.5" min="0" placeholder="Вес (кг)" data-exercise="${ex.name}" data-type="weight" inputmode="decimal" style="flex: 1; min-width: 120px;">
-          <span style="color: var(--text-muted);">×</span>
-          <input type="number" step="1" min="1" max="20" placeholder="6" value="6" data-exercise="${ex.name}" data-type="reps" inputmode="numeric" style="width: 80px;">
-          <span style="color: var(--text-muted); font-size: 0.9em;">повт.</span>
-        </div>
-        <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 6px;">
-          Пример: 80кг × 6 повторов → ТМ рассчитается автоматически
-        </div>
-      `;
-    } else {
-      // Для типов B, C, D не показываем поля
-      exerciseItem.style.display = 'none';
-    }
-    exercisesContainer.appendChild(exerciseItem);
-  });
-  
-  // Обработчик сохранения
-  document.getElementById('onboarding-save').addEventListener('click', async () => {
-    await saveOnboardingWeights();
-  });
-}
-
-// Сохранение весов из онбординга
-async function saveOnboardingWeights() {
-  const inputs = document.querySelectorAll('#onboarding-exercises input');
-  const weights = {};
-  
-  // Группируем inputs по упражнениям
-  const exerciseData = {};
-  for (const input of inputs) {
-    const exercise = input.dataset.exercise;
-    const type = input.dataset.type; // 'weight' или 'reps'
-    
-    if (!exerciseData[exercise]) {
-      exerciseData[exercise] = { weight: null, reps: null };
-    }
-    
-    const value = parseFloat(input.value);
-    if (!isNaN(value) && value > 0) {
-      if (type === 'weight') {
-        exerciseData[exercise].weight = value;
-      } else if (type === 'reps') {
-        exerciseData[exercise].reps = value;
-      }
-    }
-  }
-  
-  // Рассчитываем ТМ только для упражнений типа A
-  for (const [exercise, data] of Object.entries(exerciseData)) {
-    // Находим тип упражнения
-    let exerciseType = null;
-    for (const day of Object.keys(PLAN)) {
-      const found = PLAN[day].find(ex => ex.name === exercise);
-      if (found) {
-        exerciseType = found.type;
-        break;
-      }
-    }
-    
-    // Сохраняем ТМ только для типа A
-    if (exerciseType === 'A' && data.weight > 0) {
-      // Используем введенные повторы, или 6.5 по умолчанию
-      const reps = data.reps && data.reps > 0 ? data.reps : 6.5;
-      
-      // Рассчитываем e1RM из веса и повторов
-      const calculatedE1RM = e1rm(data.weight, reps);
-      
-      // ТМ = 90% от e1RM
-      const tm = Math.round(calculatedE1RM * 0.9 * 10) / 10;
-      weights[exercise] = tm;
-    }
-  }
-  
-  // Сохраняем в БД
-  for (const [exercise, tm] of Object.entries(weights)) {
-    try {
-      await dbModule.execute(
-        `INSERT OR REPLACE INTO tm (exercise, tm_kg, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
-        [exercise, tm]
-      );
-    } catch (error) {
-      console.error(`Failed to save TM for ${exercise}:`, error);
-    }
-  }
-  
-  // Удаляем онбординг и показываем основной интерфейс
-  const onboardingScreen = document.querySelector('.onboarding-screen');
-  if (onboardingScreen) onboardingScreen.remove();
-  document.querySelector('main').style.display = '';
-  document.querySelector('header').style.display = '';
-  const bottomNav = document.querySelector('.bottom-nav');
-  if (bottomNav) bottomNav.style.removeProperty('display');
-  
-  // Инициализируем интерфейс после онбординга
-  initGlobalHandlers();
-  await buildDayOptions();
-  
-  DOM.week.addEventListener('change', async () => {
-    await buildExercises();
-    await loadDashboard();
-  });
-  
-  DOM.day.addEventListener('change', async () => {
-    await buildExercises();
-  });
-  
-  await loadDashboard();
-  await loadPRs();
-  initHistoryFilters();
-  
-  // Обработчик кнопки сброса цикла
-  const resetBtn = document.getElementById('btn-reset-cycle');
-  if (resetBtn) {
-    resetBtn.addEventListener('click', async () => {
-      await resetCycle();
-      // После сброса показываем онбординг
-      const isFirstLaunch = await checkFirstLaunch();
-      if (isFirstLaunch) {
-        await showOnboarding();
-      }
-    });
-  }
-  
-  // Перезагружаем упражнения
-  await buildExercises();
-  showNotification('Базовые веса сохранены! Можно начинать тренировки.', 'success');
-}
 
 // Инициализация
 async function initApp() {
@@ -3698,17 +3322,6 @@ async function initApp() {
     
     updateProgress(95, 'Инициализация интерфейса...');
     
-    // Проверяем первый запуск
-    const isFirstLaunch = await checkFirstLaunch();
-    if (isFirstLaunch) {
-      // Скрываем индикатор загрузки
-      if (loading) {
-        loading.style.display = 'none';
-      }
-      await showOnboarding();
-      return; // Выходим, онбординг сам продолжит инициализацию
-    }
-    
     // Инициализируем глобальные обработчики событий (Event Delegation)
     initGlobalHandlers();
     
@@ -3722,7 +3335,6 @@ async function initApp() {
     
     DOM.week.addEventListener('change', async () => {
       await buildExercises();
-      await loadDashboard();
     });
     
     DOM.day.addEventListener('change', async () => {
@@ -3730,7 +3342,6 @@ async function initApp() {
     });
     
     updateProgress(98, 'Загрузка статистики...');
-    await loadDashboard();
     await loadPRs();
     
     // Инициализируем фильтры истории
@@ -3744,11 +3355,6 @@ async function initApp() {
     if (resetBtn) {
       resetBtn.addEventListener('click', async () => {
         await resetCycle();
-        // После сброса показываем онбординг
-        const isFirstLaunch = await checkFirstLaunch();
-        if (isFirstLaunch) {
-          await showOnboarding();
-        }
       });
     }
     
@@ -3846,130 +3452,6 @@ function toggleTheme() {
   localStorage.setItem('theme', newTheme);
   
   showNotification(`Тема изменена на ${newTheme === 'dark' ? 'темную' : 'светлую'}`, 'info');
-}
-
-// Генератор разминки для типа A
-function generateWarmupSets(exName) {
-  const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
-  if (!card) return;
-  
-  // Находим топ-сет (самый тяжелый)
-  const setRows = card.querySelectorAll('.set-row:not(.set-header)');
-  let topWeight = 0;
-  let topReps = 0;
-  
-  setRows.forEach(row => {
-    const wInput = row.querySelector('input.w');
-    const rInput = row.querySelector('input.r');
-    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
-    const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
-    if (w > topWeight) {
-      topWeight = w;
-      topReps = r;
-    }
-  });
-  
-  if (topWeight === 0) {
-    showNotification('Сначала укажите рабочий вес', 'warning');
-    return;
-  }
-  
-  // Разминка: 40%x5, 55%x5, 70%x3, 80%x2
-  const warmupSets = [
-    { percent: 0.40, reps: 5 },
-    { percent: 0.55, reps: 5 },
-    { percent: 0.70, reps: 3 },
-    { percent: 0.80, reps: 2 }
-  ];
-  
-  const setsList = card.querySelector('.sets-list');
-  const currentCount = parseInt(card.dataset.setCount || 1);
-  
-  warmupSets.forEach((set, idx) => {
-    const weight = window.roundToStandardPlates(topWeight * set.percent, 'A');
-    const newSetNum = currentCount + idx + 1;
-    
-    const newSetRow = document.createElement('div');
-    newSetRow.className = 'set-row';
-    newSetRow.dataset.set = newSetNum;
-    newSetRow.innerHTML = `
-      <div class="set-label">
-        Разминка ${idx + 1}
-        <button class="btn-delete-set" title="Удалить сет">❌</button>
-      </div>
-      <input class="set-input w" type="text" inputmode="decimal" placeholder="${weight} кг" data-set="${newSetNum}" value="${weight}">
-      <input class="set-input r" type="text" inputmode="numeric" placeholder="${set.reps}" data-set="${newSetNum}" value="${set.reps}">
-      <div class="set-rir hidden" data-set="${newSetNum}" title="RIR: Запас повторов до отказа">—</div>
-    `;
-    
-    // Вставляем перед последним сетом (или в конец)
-    setsList.insertBefore(newSetRow, setsList.lastElementChild);
-  });
-  
-  card.dataset.setCount = currentCount + warmupSets.length;
-  computeCard(card);
-  showNotification(`Добавлено ${warmupSets.length} разминочных сетов`, 'success');
-}
-
-// Генератор бэкофф-сетов для типа A
-function generateBackoffSets(exName) {
-  const card = document.querySelector(`.exercise-card[data-exercise="${exName}"]`);
-  if (!card) return;
-  
-  // Находим топ-сет
-  const setRows = card.querySelectorAll('.set-row:not(.set-header)');
-  let topWeight = 0;
-  let topReps = 0;
-  let topRIR = null;
-  
-  setRows.forEach(row => {
-    const wInput = row.querySelector('input.w');
-    const rInput = row.querySelector('input.r');
-    const w = Number(normalizeNumber((wInput && wInput.value) ? wInput.value : 0));
-    const r = Number(normalizeNumber((rInput && rInput.value) ? rInput.value : 0));
-    const rirEl = row.querySelector('.set-rir');
-    const rirText = (rirEl && rirEl.textContent) ? rirEl.textContent : '';
-    if (w > topWeight) {
-      topWeight = w;
-      topReps = r;
-      topRIR = rirText && rirText !== '—' ? Number(rirText) : null;
-    }
-  });
-  
-  if (topWeight === 0) {
-    showNotification('Сначала укажите рабочий вес', 'warning');
-    return;
-  }
-  
-  // Бэкофф: +2 сета по 90% × (RIR+1 повторов)
-  const backoffWeight = window.roundToStandardPlates(topWeight * 0.9, 'A');
-  const backoffReps = topRIR != null ? topReps + Math.round(topRIR) + 1 : topReps + 2;
-  
-  const setsList = card.querySelector('.sets-list');
-  const currentCount = parseInt(card.dataset.setCount || 1);
-  
-  for (let i = 0; i < 2; i++) {
-    const newSetNum = currentCount + i + 1;
-    
-    const newSetRow = document.createElement('div');
-    newSetRow.className = 'set-row';
-    newSetRow.dataset.set = newSetNum;
-    newSetRow.innerHTML = `
-      <div class="set-label">
-        Бэкофф ${i + 1}
-        <button class="btn-delete-set" title="Удалить сет">❌</button>
-      </div>
-      <input class="set-input w" type="text" inputmode="decimal" placeholder="${backoffWeight} кг" data-set="${newSetNum}" value="${backoffWeight}">
-      <input class="set-input r" type="text" inputmode="numeric" placeholder="${backoffReps}" data-set="${newSetNum}" value="${backoffReps}">
-      <div class="set-rir hidden" data-set="${newSetNum}" title="RIR: Запас повторов до отказа">—</div>
-    `;
-    
-    setsList.insertBefore(newSetRow, setsList.lastElementChild);
-  }
-  
-  card.dataset.setCount = currentCount + 2;
-  computeCard(card);
-  showNotification('Добавлено 2 бэкофф-сета', 'success');
 }
 
 // Применить подсказки для всех упражнений
