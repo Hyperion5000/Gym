@@ -62,6 +62,39 @@ function rpeFromRir(rir) {
   return Math.round((10 - rir) * 10) / 10;
 }
 
+// Округление до стандартных блинов (1.25, 2.5, 5 кг)
+function roundToStandardPlates(weight) {
+  if (!weight || weight <= 0) return 0;
+  
+  // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
+  const plates = [1.25, 2.5, 5, 10, 15, 20, 25];
+  
+  // Округляем до ближайшего стандартного блина
+  let rounded = weight;
+  let minDiff = Infinity;
+  
+  for (const plate of plates) {
+    // Проверяем кратные блина
+    for (let multiplier = 1; multiplier <= 20; multiplier++) {
+      const candidate = plate * multiplier;
+      const diff = Math.abs(weight - candidate);
+      if (diff < minDiff) {
+        minDiff = diff;
+        rounded = candidate;
+      }
+      // Если уже слишком далеко, прекращаем
+      if (candidate > weight * 1.5) break;
+    }
+  }
+  
+  // Если разница слишком большая, используем стандартное округление до 2.5
+  if (minDiff > 2.5) {
+    rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
+  }
+  
+  return Math.max(0, Math.round(rounded * 10) / 10);
+}
+
 // Обратная функция: расчет веса по ТМ, целевому RIR и повторам
 function weightFromRIR(tm, targetRIR, reps) {
   if (!tm || !targetRIR || !reps || tm <= 0 || reps <= 0) return null;
@@ -112,39 +145,6 @@ function targetToNumber(t) {
   }
   const n = Number(t.replace(',', '.'));
   return isNaN(n) ? null : n;
-}
-
-// Округление до стандартных блинов (1.25, 2.5, 5 кг)
-function roundToStandardPlates(weight) {
-  if (!weight || weight <= 0) return 0;
-  
-  // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
-  const plates = [1.25, 2.5, 5, 10, 15, 20, 25];
-  
-  // Округляем до ближайшего стандартного блина
-  let rounded = weight;
-  let minDiff = Infinity;
-  
-  for (const plate of plates) {
-    // Проверяем кратные блина
-    for (let multiplier = 1; multiplier <= 20; multiplier++) {
-      const candidate = plate * multiplier;
-      const diff = Math.abs(weight - candidate);
-      if (diff < minDiff) {
-        minDiff = diff;
-        rounded = candidate;
-      }
-      // Если уже слишком далеко, прекращаем
-      if (candidate > weight * 1.5) break;
-    }
-  }
-  
-  // Если разница слишком большая, используем стандартное округление до 2.5
-  if (minDiff > 2.5) {
-    rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
-  }
-  
-  return Math.max(0, Math.round(rounded * 10) / 10);
 }
 
 function todayISO() {
@@ -1717,39 +1717,6 @@ async function suggestForExercise(exName) {
   }
 }
 
-// Округление до стандартных блинов (1.25, 2.5, 5 кг)
-function roundToStandardPlates(weight) {
-  if (!weight || weight <= 0) return 0;
-  
-  // Стандартные блины: 1.25, 2.5, 5, 10, 15, 20, 25 кг
-  const plates = [1.25, 2.5, 5, 10, 15, 20, 25];
-  
-  // Округляем до ближайшего стандартного блина
-  let rounded = weight;
-  let minDiff = Infinity;
-  
-  for (const plate of plates) {
-    // Проверяем кратные блина
-    for (let multiplier = 1; multiplier <= 20; multiplier++) {
-      const candidate = plate * multiplier;
-      const diff = Math.abs(weight - candidate);
-      if (diff < minDiff) {
-        minDiff = diff;
-        rounded = candidate;
-      }
-      // Если уже слишком далеко, прекращаем
-      if (candidate > weight * 1.5) break;
-    }
-  }
-  
-  // Если разница слишком большая, используем стандартное округление до 2.5
-  if (minDiff > 2.5) {
-    rounded = Math.round(weight / LIMITS.WEIGHT_ROUNDING) * LIMITS.WEIGHT_ROUNDING;
-  }
-  
-  return Math.max(0, Math.round(rounded * 10) / 10);
-}
-
 // Сбор данных из карточек
 function collectRows() {
   const out = [];
@@ -2571,9 +2538,10 @@ async function saveOnboardingWeights() {
 
 // Инициализация
 async function initApp() {
+  const loading = document.getElementById('loading');
+  
   try {
-    // Скрываем индикатор загрузки
-    const loading = document.getElementById('loading');
+    updateProgress(10, 'Инициализация базы данных...');
     
     await dbModule.initDatabase();
     

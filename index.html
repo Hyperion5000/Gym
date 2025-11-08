@@ -394,10 +394,36 @@
       });
       
       // Загружаем модуль app.js после загрузки SQL.js
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = './app.js';
-      document.body.appendChild(script);
+      // Проверяем, что модуль еще не загружен
+      if (!document.querySelector('script[src="./app.js"]')) {
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = './app.js';
+        
+        // Обработка ошибок загрузки
+        script.onerror = (error) => {
+          console.error('Ошибка загрузки app.js:', error);
+          const loading = document.getElementById('loading');
+          if (loading) {
+            loading.innerHTML = `
+              <div style="text-align: center; max-width: 320px; padding: 24px;">
+                <div style="margin-bottom: 24px; font-size: 48px;">⚠️</div>
+                <div style="margin-bottom: 16px; font-weight: 600; font-size: 20px;">Ошибка загрузки</div>
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 16px;">
+                  Не удалось загрузить приложение. Пожалуйста, обновите страницу.
+                </div>
+                <button onclick="location.reload()" style="padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px;">
+                  Обновить страницу
+                </button>
+              </div>
+            `;
+          }
+        };
+        
+        document.body.appendChild(script);
+      } else {
+        console.warn('app.js уже загружается, пропускаем повторную загрузку');
+      }
     })();
   </script>
 </body>
