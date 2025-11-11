@@ -1,0 +1,223 @@
+<script>
+  const state = {
+    week: 1,
+    day: 1,
+    data: null,
+    isLoading: false
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("week-select").addEventListener("change", handleSelectionChange);
+    document.getElementById("day-select").addEventListener("change", handleSelectionChange);
+    document.getElementById("load-day").addEventListener("click", loadDay);
+    document.getElementById("save-log").addEventListener("click", saveLog);
+
+    loadDay();
+  });
+
+  function handleSelectionChange(event) {
+    const target = event.target;
+    if (target.id === "week-select") {
+      state.week = Number(target.value);
+    } else if (target.id === "day-select") {
+      state.day = Number(target.value);
+    }
+  }
+
+  function setLoading(isLoading) {
+    state.isLoading = isLoading;
+    document.getElementById("spinner").hidden = !isLoading;
+    document.querySelectorAll("button, select").forEach((el) => (el.disabled = isLoading));
+  }
+
+  function loadDay() {
+    setLoading(true);
+    google.script.run
+      .withSuccessHandler((data) => {
+        state.data = data;
+        renderContent(data);
+        showToast(`Неделя ${data.week}, день ${data.day} загружены.`);
+        setLoading(false);
+      })
+      .withFailureHandler((error) => {
+        console.error(error);
+        showToast(error.message || "Не удалось загрузить день.", true);
+        setLoading(false);
+      })
+      .getDayData(state.week, state.day);
+  }
+
+  function renderContent(data) {
+    const container = document.getElementById("content");
+    if (!data || !data.rows || !data.rows.length) {
+      container.innerHTML = `<div class="placeholder">На выбранный день нет упражнений.</div>`;
+      return;
+    }
+
+    const groups = groupRowsByExercise(data.rows);
+    const warmup = data.warmup || {};
+
+    const html = groups
+      .map((group) => {
+        const warmupHtml = buildWarmupHtml(warmup[group.exercise], data.units);
+        const setsHtml = group.rows
+          .map((row) => {
+            const index = row.index;
+            const recommended = row.item.recommended ?? "";
+            return `
+              <div class="set-row" data-index="${index}">
+                <div class="set-row__meta">
+                  <span>Сет #${row.item.set}</span>
+                  <span>Мин: ${fallback(row.item.repMin, "-")}</span>
+                  <span>Макс: ${fallback(row.item.repMax, "-")}</span>
+                  <span>Plan RIR: ${fallback(row.item.rirPlan, "-")}</span>
+                </div>
+                <div class="input-field">
+                  <label>Факт вес (${data.units})</label>
+                  <input type="number" step="any" name="row-${index}-weight" placeholder="${recommended}" />
+                </div>
+                <div class="input-field">
+                  <label>Факт повторы</label>
+                  <input type="number" step="1" name="row-${index}-reps" />
+                </div>
+                <div class="input-field">
+                  <label>Факт RIR</label>
+                  <input type="number" step="1" name="row-${index}-rir" />
+                </div>
+                <div class="input-field" style="grid-column: span 2;">
+                  <label>Заметка</label>
+                  <textarea name="row-${index}-note" maxlength="160"></textarea>
+                </div>
+              </div>`;
+          })
+          .join("");
+
+        const recommendedText =
+          group.rows[0].item.recommended != null
+            ? `Рекомендовано: ${group.rows[0].item.recommended} ${data.units}`
+            : "Рекомендация не указана";
+
+        return `
+          <article class="exercise">
+            <h2>${group.exercise}</h2>
+            <p class="exercise__meta">${recommendedText}</p>
+            ${warmupHtml}
+            <div class="sets">
+              ${setsHtml}
+            </div>
+          </article>`;
+      })
+      .join("");
+
+    container.innerHTML = html;
+  }
+
+  function buildWarmupHtml(warmupSteps, units) {
+    if (!warmupSteps || !warmupSteps.length) return "";
+    const items = warmupSteps
+      .map((step) => {
+        const weightText =
+          step.weight === "..."
+            ? "..."
+            : step.weight != null
+            ? `${step.weight} ${units}`
+            : "";
+        const pctText = step.pct != null ? `${Math.round(step.pct * 100)}%` : "";
+        return `<span>${step.label}: ${pctText} ${weightText} × ${step.reps}</span>`;
+      })
+      .join(" · ");
+    return `<p class="exercise__warmup">${items}</p>`;
+  }
+
+  function groupRowsByExercise(rows) {
+    const map = new Map();
+    rows.forEach((item, index) => {
+      if (!map.has(item.exercise)) {
+        map.set(item.exercise, []);
+      }
+      map.get(item.exercise).push({ index, item });
+    });
+    return Array.from(map.entries()).map(([exercise, groupRows]) => ({
+      exercise,
+      rows: groupRows
+    }));
+  }
+
+  function saveLog() {
+    if (!state.data || !state.data.rows || !state.data.rows.length) {
+      showToast("Сначала загрузите план.", true);
+      return;
+    }
+
+    const rows = collectFormRows();
+    if (!rows.length) {
+      showToast("Нет данных для сохранения.", true);
+      return;
+    }
+
+    setLoading(true);
+    google.script.run
+      .withSuccessHandler((result) => {
+        showToast(`Сохранено: ${result.added || 0}, PR: ${result.prs || 0}`);
+        loadDay();
+      })
+      .withFailureHandler((error) => {
+        console.error(error);
+        showToast(error.message || "Не удалось сохранить.", true);
+        setLoading(false);
+      })
+      .saveLog({ rows });
+  }
+
+  function collectFormRows() {
+    return state.data.rows.map((row, index) => {
+      return {
+        week: state.data.week,
+        day: state.data.day,
+        exercise: row.exercise,
+        set: row.set,
+        repMin: row.repMin,
+        repMax: row.repMax,
+        rirPlan: row.rirPlan,
+        prescribed: row.prescribed,
+        reps: readNumber(`row-${index}-reps`),
+        weight: readNumber(`row-${index}-weight`),
+        rir: readNumber(`row-${index}-rir`),
+        note: readText(`row-${index}-note`)
+      };
+    });
+  }
+
+  function readNumber(name) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (!el) return null;
+    const value = el.value.trim();
+    if (!value) return null;
+    const number = Number(value.replace(",", "."));
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function readText(name) {
+    const el = document.querySelector(`[name="${name}"]`);
+    return el ? el.value.trim() : "";
+  }
+
+  function fallback(value, fallbackValue) {
+    return value == null || value === "" ? fallbackValue : value;
+  }
+
+  function showToast(message, isError = false) {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = `toast ${isError ? "toast--error" : ""}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateY(8px)";
+      setTimeout(() => container.removeChild(toast), 200);
+    }, 2600);
+  }
+</script>
+

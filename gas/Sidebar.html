@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GS Trainer</title>
+    <?!= include("SidebarStyles"); ?>
+  </head>
+  <body>
+    <main class="app" id="app">
+      <header class="app__header">
+        <h1>GS TRAINER</h1>
+        <p>Выбери неделю и день, введи фактические значения, остальное сделаем сами.</p>
+      </header>
+
+      <section class="controls">
+        <label class="field">
+          <span>Неделя</span>
+          <select id="week-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>День</span>
+          <select id="day-select">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <button class="btn btn--secondary" id="load-day">Загрузить</button>
+      </section>
+
+      <section class="content" id="content">
+        <div class="placeholder">Выберите неделю и день, затем загрузите план.</div>
+      </section>
+
+      <footer class="app__footer">
+        <button class="btn btn--primary" id="save-log">Сохранить</button>
+      </footer>
+    </main>
+
+    <div class="toast-container" id="toast-container"></div>
+    <div class="spinner" id="spinner" hidden>
+      <div class="spinner__dot"></div>
+      <div class="spinner__dot"></div>
+      <div class="spinner__dot"></div>
+    </div>
+
+    <?!= include("SidebarApp"); ?>
+  </body>
+</html>
+

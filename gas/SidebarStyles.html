@@ -1,0 +1,311 @@
+<style>
+  :root {
+    color-scheme: dark;
+    font-family: "Fira Code", "JetBrains Mono", "Courier New", monospace;
+    --bg: #041104;
+    --bg-alt: rgba(8, 28, 10, 0.85);
+    --fg: #39ff88;
+    --fg-dim: rgba(57, 255, 136, 0.65);
+    --accent: rgba(57, 255, 136, 0.9);
+    --border: rgba(57, 255, 136, 0.35);
+    --danger: rgba(255, 102, 102, 0.9);
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: radial-gradient(circle at top, rgba(57, 255, 136, 0.12), transparent 65%) var(--bg);
+    color: var(--fg);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(57, 255, 136, 0.06) 3px,
+      rgba(57, 255, 136, 0.06) 4px
+    );
+    opacity: 0.28;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 0 16px 16px;
+  }
+
+  .app__header {
+    text-align: center;
+    padding: 16px 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app__header h1 {
+    margin: 0;
+    font-size: 1.3rem;
+    letter-spacing: 0.12em;
+  }
+
+  .app__header p {
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+    color: var(--fg-dim);
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .controls .field:last-of-type {
+    grid-column: span 1;
+  }
+
+  .controls .btn {
+    grid-column: span 2;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .field span {
+    font-size: 0.8rem;
+    color: var(--fg-dim);
+  }
+
+  select {
+    padding: 10px 12px;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--fg);
+  }
+
+  select:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .btn {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-alt);
+    color: var(--fg);
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn--primary {
+    background: linear-gradient(135deg, var(--accent), rgba(46, 180, 104, 0.75));
+    color: #021802;
+  }
+
+  .btn--primary:hover:not(:disabled) {
+    box-shadow: 0 0 16px rgba(57, 255, 136, 0.5);
+  }
+
+  .btn--secondary:hover:not(:disabled) {
+    box-shadow: 0 0 12px rgba(57, 255, 136, 0.4);
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 6px;
+    margin-bottom: 16px;
+  }
+
+  .placeholder {
+    margin-top: 32px;
+    text-align: center;
+    color: var(--fg-dim);
+    font-size: 0.95rem;
+  }
+
+  .exercise {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+    background: rgba(8, 24, 10, 0.9);
+  }
+
+  .exercise h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    letter-spacing: 0.08em;
+  }
+
+  .exercise__meta,
+  .exercise__warmup {
+    margin: 6px 0 0;
+    font-size: 0.85rem;
+    color: var(--fg-dim);
+  }
+
+  .sets {
+    margin-top: 10px;
+    border-top: 1px solid rgba(57, 255, 136, 0.2);
+  }
+
+  .set-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(57, 255, 136, 0.15);
+  }
+
+  .set-row:last-child {
+    border-bottom: none;
+  }
+
+  .set-row__meta {
+    grid-column: span 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 0.8rem;
+    color: var(--fg-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .input-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .input-field label {
+    font-size: 0.75rem;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+  }
+
+  .input-field input,
+  .input-field textarea {
+    background: rgba(6, 18, 8, 0.85);
+    border: 1px solid rgba(57, 255, 136, 0.4);
+    border-radius: 6px;
+    padding: 8px;
+    color: var(--fg);
+    font-family: inherit;
+  }
+
+  .input-field input:focus,
+  .input-field textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .input-field textarea {
+    resize: vertical;
+    min-height: 48px;
+  }
+
+  .app__footer {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  .toast-container {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+  }
+
+  .toast {
+    background: var(--accent);
+    color: #021802;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    min-width: 180px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+    animation: fade-in 0.2s ease-out;
+  }
+
+  .toast--error {
+    background: var(--danger);
+    color: #2b0000;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .spinner {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(4, 9, 4, 0.75);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+  }
+
+  .spinner__dot {
+    width: 10px;
+    height: 10px;
+    margin: 0 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 1s infinite ease-in-out;
+  }
+
+  .spinner__dot:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+
+  .spinner__dot:nth-child(3) {
+    animation-delay: 0.2s;
+  }
+
+  @keyframes pulse {
+    0%, 80%, 100% {
+      opacity: 0.2;
+      transform: scale(0.8);
+    }
+    40% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+</style>
+
