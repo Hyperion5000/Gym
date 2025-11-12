@@ -170,22 +170,34 @@
   }
 
   function collectFormRows() {
-    return state.data.rows.map((row, index) => {
-      return {
-        week: state.data.week,
-        day: state.data.day,
-        exercise: row.exercise,
-        set: row.set,
-        repMin: row.repMin,
-        repMax: row.repMax,
-        rirPlan: row.rirPlan,
-        prescribed: row.prescribed,
-        reps: readNumber(`row-${index}-reps`),
-        weight: readNumber(`row-${index}-weight`),
-        rir: readNumber(`row-${index}-rir`),
-        note: readText(`row-${index}-note`)
-      };
-    });
+    return state.data.rows
+      .map((row, index) => {
+        const reps = readNumber(`row-${index}-reps`);
+        const weight = readNumber(`row-${index}-weight`);
+        const rir = readNumber(`row-${index}-rir`);
+        const note = readText(`row-${index}-note`);
+
+        // Пропускаем строки без данных (нет ни веса, ни повторов, ни RIR, ни заметки)
+        if (reps == null && weight == null && rir == null && !note) {
+          return null;
+        }
+
+        return {
+          week: state.data.week,
+          day: state.data.day,
+          exercise: String(row.exercise || "").trim(),
+          set: Number(row.set) || 0,
+          repMin: row.repMin != null ? Number(row.repMin) : null,
+          repMax: row.repMax != null ? Number(row.repMax) : null,
+          rirPlan: row.rirPlan != null ? Number(row.rirPlan) : null,
+          prescribed: row.prescribed != null ? String(row.prescribed) : "",
+          reps: reps,
+          weight: weight,
+          rir: rir,
+          note: note
+        };
+      })
+      .filter((row) => row != null);
   }
 
   function readNumber(name) {

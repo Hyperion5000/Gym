@@ -114,31 +114,36 @@ function recommendForDay(week, day) {
   const tmMap = getTMsMap_();
   const warmup = {};
 
-  const rows = planRows.map((row) => {
-    const exercise = row.exercise;
-    const tmEntry = tmMap[exercise];
-    const tm = tmEntry ? tmEntry.tm : null;
-    const recommended =
-      tm != null && row.pct != null
-        ? roundToStep_(tm * row.pct, settings.step)
-        : null;
+  const rows = planRows
+    .filter((row) => row.exercise && String(row.exercise).trim())
+    .map((row) => {
+      const exercise = String(row.exercise || "").trim();
+      if (!exercise) return null;
 
-    if (tm != null && !warmup[exercise]) {
-      warmup[exercise] = buildWarmup_(exercise, tm, recommended, settings);
-    }
+      const tmEntry = tmMap[exercise];
+      const tm = tmEntry ? tmEntry.tm : null;
+      const recommended =
+        tm != null && row.pct != null
+          ? roundToStep_(tm * row.pct, settings.step)
+          : null;
 
-    return {
-      exercise,
-      set: row.set,
-      repMin: row.repMin,
-      repMax: row.repMax,
-      rirPlan: row.rirPlan,
-      pct: row.pct,
-      prescribed: row.prescribed,
-      tm,
-      recommended
-    };
-  });
+      if (tm != null && !warmup[exercise]) {
+        warmup[exercise] = buildWarmup_(exercise, tm, recommended, settings);
+      }
+
+      return {
+        exercise,
+        set: row.set || 0,
+        repMin: row.repMin,
+        repMax: row.repMax,
+        rirPlan: row.rirPlan,
+        pct: row.pct,
+        prescribed: row.prescribed || "",
+        tm,
+        recommended
+      };
+    })
+    .filter((row) => row != null);
 
   return {
     week,
@@ -177,13 +182,23 @@ function saveLog(payload) {
   const prs = [];
 
   payload.rows.forEach((row) => {
-    const key = `${row.exercise}__${row.set}`;
+    // Валидации согласно ТЗ v5
+    const exercise = String(row.exercise || "").trim();
+    if (!exercise) {
+      throw new Error("Exercise не может быть пустым.");
+    }
+
+    const set = numberOrNull_(row.set);
+    if (set == null || set < 1) {
+      throw new Error(`Set должен быть положительным числом, получено: ${row.set}`);
+    }
+
+    const key = `${exercise}__${set}`;
 
     if (duplicateCache[key]) {
       return; // пропускаем дубликат
     }
 
-    // Валидации согласно ТЗ v5
     const week = numberOrNull_(row.week);
     const day = numberOrNull_(row.day);
     if (week != null && (week < 1 || week > 4)) {
@@ -222,10 +237,10 @@ function saveLog(payload) {
 
     valuesToAppend.push([
       now,
-      numberOrNull_(row.week),
-      numberOrNull_(row.day),
-      row.exercise,
-      numberOrNull_(row.set),
+      week,
+      day,
+      exercise,
+      set,
       repMin,
       repMax,
       rirPlan,
@@ -240,10 +255,10 @@ function saveLog(payload) {
     ]);
 
     if (tm != null) {
-      const current = tmMap[row.exercise];
+      const current = tmMap[exercise];
       if (!current || (current.e1rm != null && e1rm > current.e1rm) || !current.e1rm) {
-        prs.push({ exercise: row.exercise, e1rm, tm });
-        tmMap[row.exercise] = { e1rm, tm, rowIndex: current ? current.rowIndex : null };
+        prs.push({ exercise: exercise, e1rm, tm });
+        tmMap[exercise] = { e1rm, tm, rowIndex: current ? current.rowIndex : null };
       }
     }
 
@@ -279,12 +294,20 @@ function doGet(e) {
     if (fn === "day") {
       const week = Number(e.parameter.week) || 1;
       const day = Number(e.parameter.day) || 1;
+      
+      if (week < 1 || week > 4 || day < 1 || day > 4) {
+        return ContentService.createTextOutput(
+          JSON.stringify({ ok: false, error: "Week и Day должны быть в диапазоне 1-4" })
+        ).setMimeType(ContentService.MimeType.JSON);
+      }
+      
       const data = recommendForDay(week, day);
       const settings = getSettings_();
       const tmMap = getTMsMap_();
 
       return ContentService.createTextOutput(
         JSON.stringify({
+          ok: true,
           plan: data.rows,
           settings: {
             units: settings.units,
@@ -292,7 +315,9 @@ function doGet(e) {
             barWeight: settings.barWeight
           },
           tms: Object.keys(tmMap).reduce((acc, key) => {
-            acc[key] = { e1rm: tmMap[key].e1rm, tm: tmMap[key].tm };
+            if (tmMap[key]) {
+              acc[key] = { e1rm: tmMap[key].e1rm, tm: tmMap[key].tm };
+            }
             return acc;
           }, {})
         })
@@ -301,6 +326,7 @@ function doGet(e) {
       const settings = getSettings_();
       return ContentService.createTextOutput(
         JSON.stringify({
+          ok: true,
           units: settings.units,
           step: settings.step,
           barWeight: settings.barWeight,
@@ -345,6 +371,10 @@ function archiveOldLogs() {
   const toKeep = [];
 
   rows.forEach((row) => {
+    if (!row || row.length === 0) {
+      toKeep.push(row);
+      return;
+    }
     const ts = row[0];
     if (ts instanceof Date && ts < cutoff) {
       toArchive.push(row);
@@ -368,9 +398,13 @@ function archiveOldLogs() {
 /* ------------------------- Helpers: Sheets ------------------------------- */
 
 function appendToSheet_(sheet, values) {
+  if (!values || !values.length || !values[0] || !values[0].length) {
+    return;
+  }
   const startRow = sheet.getLastRow() + 1;
   const startCol = 1;
-  sheet.getRange(startRow, startCol, values.length, values[0].length).setValues(values);
+  const numCols = values[0].length;
+  sheet.getRange(startRow, startCol, values.length, numCols).setValues(values);
 }
 
 function ensureSheet_(name) {
@@ -500,13 +534,16 @@ function validateSetup() {
 
     const keyIndex = {};
     for (let i = 1; i < allData.length; i++) {
-      const key = String(allData[i][0] || "").trim();
+      const row = allData[i];
+      if (!row || row.length < 2) continue;
+      const key = String(row[0] || "").trim();
       if (key) keyIndex[key] = i + 1;
     }
 
     Object.keys(SETTINGS_DEFAULTS).forEach((key) => {
       if (!keyIndex[key]) {
         issues.push(`Settings: отсутствует ключ ${key}.`);
+        // Подсвечиваем заголовок, так как конкретная строка не найдена
         settingsSheet.getRange(1, 2, 1, 2).setBackground("#ffcccc");
       }
     });
@@ -540,14 +577,19 @@ function validateHeader_(sheetName, expectedHeaders, issues, displayName) {
     return;
   }
 
-  const headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
+  const lastCol = sheet.getLastColumn();
+  const numCols = Math.max(expectedHeaders.length, lastCol);
+  const headerRange = sheet.getRange(1, 1, 1, numCols);
   headerRange.setBackground("#ffffff");
   const headerValues = headerRange.getValues()[0].map((cell) => String(cell || "").trim());
 
   expectedHeaders.forEach((expected, index) => {
-    if ((headerValues[index] || "") !== expected) {
-      issues.push(`${label}: ожидался столбец "${expected}" в позиции ${index + 1}.`);
-      sheet.getRange(1, index + 1).setBackground("#ffcccc");
+    const actual = headerValues[index] || "";
+    if (actual !== expected) {
+      issues.push(`${label}: ожидался столбец "${expected}" в позиции ${index + 1}, получен "${actual}".`);
+      if (index + 1 <= numCols) {
+        sheet.getRange(1, index + 1).setBackground("#ffcccc");
+      }
     }
   });
 }
@@ -638,17 +680,18 @@ function addMainLiftReduced_(rows, week, day, exercise, phase, backOffSets) {
 }
 
 function addPlanRow_(rows, week, day, exercise, setNumber, repMin, repMax, rir, prescribed, pct) {
+  const exerciseKey = String(exercise || "").replace(/[^A-Za-z0-9А-Яа-я]+/g, "_");
   rows.push([
-    `W${week}D${day}-${exercise.replace(/[^A-Za-z0-9А-Яа-я]+/g, "_")}-S${setNumber}`,
-    week,
-    day,
-    exercise,
-    setNumber,
-    repMin,
-    repMax,
-    rir,
-    prescribed || "",
-    pct === "" || pct == null ? "" : pct
+    `W${week}D${day}-${exerciseKey}-S${setNumber}`,
+    Number(week) || 0,
+    Number(day) || 0,
+    String(exercise || ""),
+    Number(setNumber) || 0,
+    numberOrNull_(repMin),
+    numberOrNull_(repMax),
+    numberOrNull_(rir),
+    prescribed != null ? String(prescribed) : "",
+    pct === "" || pct == null || pct === undefined ? "" : numberOrNull_(pct)
   ]);
 }
 
@@ -657,10 +700,15 @@ function getSettings_() {
   const sheet = ss.getSheetByName(SHEET_SETTINGS);
   if (!sheet) throw new Error("Лист Settings не найден.");
 
-  const range = sheet.getRange(1, 2, sheet.getLastRow(), 2).getValues();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    throw new Error("Лист Settings пуст или содержит только заголовки.");
+  }
+
+  const range = sheet.getRange(1, 2, lastRow, 2).getValues();
   const map = {};
   range.forEach((row) => {
-    const key = String(row[0]).trim();
+    const key = String(row[0] || "").trim();
     const value = row[1];
     if (key) {
       map[key] = value;
@@ -687,20 +735,28 @@ function getPlanRows_(week, day) {
   if (!sheet) throw new Error("Лист Plan не найден.");
 
   const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return [];
+  }
+
   const rows = [];
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    if (Number(row[1]) !== week || Number(row[2]) !== day) continue;
+    if (!row || row.length < PLAN_HEADERS.length) continue;
+    
+    const rowWeek = Number(row[1]);
+    const rowDay = Number(row[2]);
+    if (isNaN(rowWeek) || isNaN(rowDay) || rowWeek !== week || rowDay !== day) continue;
 
     rows.push({
-      exercise: row[3],
+      exercise: String(row[3] || "").trim(),
       set: Number(row[4]) || 0,
-      repMin: Number(row[5]) || null,
-      repMax: Number(row[6]) || null,
-      rirPlan: Number(row[7]) || null,
-      prescribed: row[8],
-      pct: row[9] !== "" && row[9] != null ? Number(row[9]) : null
+      repMin: numberOrNull_(row[5]),
+      repMax: numberOrNull_(row[6]),
+      rirPlan: numberOrNull_(row[7]),
+      prescribed: row[8] != null ? String(row[8]) : "",
+      pct: row[9] !== "" && row[9] != null && row[9] !== undefined ? numberOrNull_(row[9]) : null
     });
   }
 
@@ -713,11 +769,23 @@ function getTMsMap_() {
   if (!sheet) throw new Error("Лист TMs не найден.");
 
   const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    return {};
+  }
+
   const map = {};
   for (let i = 1; i < data.length; i++) {
-    const [exercise, e1rm, tm] = data[i];
+    const row = data[i];
+    if (!row || row.length === 0) continue;
+    
+    const exercise = String(row[0] || "").trim();
     if (!exercise) continue;
-    map[exercise] = { e1rm: Number(e1rm) || null, tm: Number(tm) || null, rowIndex: i + 1 };
+    
+    map[exercise] = {
+      e1rm: numberOrNull_(row[1]),
+      tm: numberOrNull_(row[2]),
+      rowIndex: i + 1
+    };
   }
   return map;
 }
@@ -736,16 +804,21 @@ function upsertTMs_(sheet, prs, step) {
 
   const indexMap = {};
   for (let i = 1; i < current.length; i++) {
-    const name = current[i][0];
+    const row = current[i];
+    if (!row || row.length === 0) continue;
+    const name = String(row[0] || "").trim();
     if (name) indexMap[name] = i;
   }
 
   prs.forEach((entry) => {
-    const tmValue = roundToStep_(entry.tm, step);
-    const rowValues = [entry.exercise, entry.e1rm, tmValue, new Date()];
+    const exercise = String(entry.exercise || "").trim();
+    if (!exercise) return;
 
-    if (Object.prototype.hasOwnProperty.call(indexMap, entry.exercise)) {
-      const rowIndex = indexMap[entry.exercise] + 1;
+    const tmValue = roundToStep_(entry.tm, step);
+    const rowValues = [exercise, entry.e1rm, tmValue, new Date()];
+
+    if (Object.prototype.hasOwnProperty.call(indexMap, exercise)) {
+      const rowIndex = indexMap[exercise] + 1;
       sheet.getRange(rowIndex, 1, 1, rowValues.length).setValues([rowValues]);
     } else {
       sheet.appendRow(rowValues);
@@ -784,20 +857,26 @@ function buildWarmup_(exercise, tm, recommended, settings) {
 }
 
 function buildDuplicateCache_(sheet, now) {
-  const startRow = Math.max(2, sheet.getLastRow() - MAX_DUPLICATE_SCAN_ROWS + 1);
-  const numRows = sheet.getLastRow() - startRow + 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return {};
+
+  const startRow = Math.max(2, lastRow - MAX_DUPLICATE_SCAN_ROWS + 1);
+  const numRows = lastRow - startRow + 1;
   if (numRows <= 0) return {};
 
   const data = sheet.getRange(startRow, 1, numRows, LOG_COLUMNS.length).getValues();
   const cache = {};
 
   data.forEach((row) => {
+    if (!row || row.length < LOG_COLUMNS.length) return;
+    
     const timestamp = row[0];
-    const exercise = row[3];
+    const exercise = String(row[3] || "").trim();
     const set = row[4];
 
     if (!(timestamp instanceof Date)) return;
-    if (Math.abs(now - timestamp) > DUPLICATE_WINDOW_MS) return;
+    if (Math.abs(now.getTime() - timestamp.getTime()) > DUPLICATE_WINDOW_MS) return;
+    if (!exercise || set == null) return;
 
     const key = `${exercise}__${set}`;
     cache[key] = true;
@@ -808,6 +887,7 @@ function buildDuplicateCache_(sheet, now) {
 
 function roundToStep_(value, step) {
   if (value == null || step == null || step <= 0) return null;
+  if (!Number.isFinite(value) || !Number.isFinite(step)) return null;
   return Math.round(value / step) * step;
 }
 
