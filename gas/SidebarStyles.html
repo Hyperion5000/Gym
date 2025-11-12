@@ -2,6 +2,8 @@
   :root {
     color-scheme: dark;
     font-family: "Fira Code", "JetBrains Mono", "Courier New", monospace;
+    font-size: 16px;
+    line-height: 1.5;
     --bg: #041104;
     --bg-alt: rgba(8, 28, 10, 0.85);
     --fg: #39ff88;
@@ -11,11 +13,36 @@
     --danger: rgba(255, 102, 102, 0.9);
   }
 
+  html,
+  body {
+    height: 100%;
+  }
+
   body {
     margin: 0;
     padding: 0;
     background: radial-gradient(circle at top, rgba(57, 255, 136, 0.12), transparent 65%) var(--bg);
     color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+  }
+
+  body,
+  button,
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
   }
 
   body::after {
@@ -37,7 +64,10 @@
     display: flex;
     flex-direction: column;
     height: 100vh;
-    padding: 0 16px 16px;
+    padding: calc(env(safe-area-inset-top, 0px) + 0px)
+      calc(env(safe-area-inset-right, 0px) + 16px)
+      calc(env(safe-area-inset-bottom, 0px) + 16px)
+      calc(env(safe-area-inset-left, 0px) + 16px);
   }
 
   .app__header {
@@ -54,7 +84,7 @@
 
   .app__header p {
     margin: 6px 0 0;
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--fg-dim);
   }
 
@@ -82,16 +112,17 @@
   }
 
   .field span {
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     color: var(--fg-dim);
   }
 
   select {
-    padding: 10px 12px;
+    padding: 12px;
     background: var(--bg-alt);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--fg);
+    min-height: 48px;
   }
 
   select:focus {
@@ -100,12 +131,12 @@
   }
 
   .btn {
-    padding: 12px;
+    padding: 14px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--bg-alt);
     color: var(--fg);
-    font-size: 0.95rem;
+    font-size: 1rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
@@ -141,7 +172,7 @@
     margin-top: 32px;
     text-align: center;
     color: var(--fg-dim);
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
 
   .exercise {
@@ -154,14 +185,14 @@
 
   .exercise h2 {
     margin: 0;
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     letter-spacing: 0.08em;
   }
 
   .exercise__meta,
   .exercise__warmup {
     margin: 6px 0 0;
-    font-size: 0.85rem;
+    font-size: 1rem;
     color: var(--fg-dim);
   }
 
@@ -187,7 +218,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px 12px;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     color: var(--fg-dim);
     letter-spacing: 0.05em;
   }
@@ -199,7 +230,7 @@
   }
 
   .input-field label {
-    font-size: 0.75rem;
+    font-size: 0.95rem;
     color: var(--fg-dim);
     text-transform: uppercase;
   }
@@ -209,9 +240,10 @@
     background: rgba(6, 18, 8, 0.85);
     border: 1px solid rgba(57, 255, 136, 0.4);
     border-radius: 6px;
-    padding: 8px;
+    padding: 12px 10px;
     color: var(--fg);
     font-family: inherit;
+    min-height: 48px;
   }
 
   .input-field input:focus,
@@ -244,9 +276,9 @@
     background: var(--accent);
     color: #021802;
     border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 0.85rem;
-    min-width: 180px;
+    padding: 12px 16px;
+    font-size: 0.95rem;
+    min-width: 200px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
@@ -305,6 +337,53 @@
     40% {
       opacity: 1;
       transform: scale(1);
+    }
+  }
+
+  @media (max-width: 480px) {
+    .app {
+      padding: calc(env(safe-area-inset-top, 0px) + 0px)
+        calc(env(safe-area-inset-right, 0px) + 12px)
+        calc(env(safe-area-inset-bottom, 0px) + 16px)
+        calc(env(safe-area-inset-left, 0px) + 12px);
+    }
+
+    .app__header h1 {
+      font-size: 1.05rem;
+      letter-spacing: 0.1em;
+    }
+
+    .controls {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .controls .btn {
+      grid-column: span 1;
+    }
+
+    .exercise {
+      padding: 12px 10px;
+    }
+
+    .set-row {
+      grid-template-columns: 1fr;
+    }
+
+    .set-row__meta {
+      gap: 6px 12px;
+    }
+
+    .input-field textarea {
+      min-height: 56px;
+    }
+
+    .toast-container {
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      bottom: 24px;
+      width: min(90%, 320px);
     }
   }
 </style>
