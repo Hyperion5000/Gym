@@ -472,32 +472,36 @@ function buildPlanTemplate_() {
   phases.forEach((phase) => {
     const week = phase.week;
 
+    // День 1 — Жим (тяжёлый) + плечи + трицепс
     addMainLift_(rows, week, 1, "Жим лёжа (штанга)", phase);
-    addAccessory_(rows, week, 1, "Жим плеч гантелями (сидя)", 3, 6, 8, 2);
+    addAccessory_(rows, week, 1, "Жим гантелей сидя", 3, 6, 8, 2);
     addAccessory_(rows, week, 1, "Махи в стороны", 4, 12, 20, 2);
-    addAccessory_(rows, week, 1, "Разгибания трицепса (канат)", 3, 10, 15, 1);
-    addAccessory_(rows, week, 1, "Задняя дельта (опц.)", 2, 15, 20, 2);
+    addMainLiftWithPct_(rows, week, 1, "Брусья (нагруженные)", 3, 6, 10, 2, phase.backPct);
+    addAccessory_(rows, week, 1, "Канат на трицепс", 3, 10, 15, 2);
 
+    // День 2 — Тяга (становая) + спина + бицепс + задняя цепь
     addMainLift_(rows, week, 2, "Становая тяга (классика)", phase);
-    addAccessory_(rows, week, 2, "Тяга в наклоне (опора грудью/машина)", 4, 6, 10, 2);
+    addAccessory_(rows, week, 2, "Тяга в наклоне (горизонтальная)", 4, 6, 10, 2);
     addAccessory_(rows, week, 2, "Тяга верхнего блока", 3, 8, 12, 2);
-    addAccessory_(rows, week, 2, "Сгибания ног сидя (машина)", 3, 10, 15, 2);
-    addAccessory_(rows, week, 2, "Бицепс EZ", 2, 8, 12, 2);
+    addAccessory_(rows, week, 2, "Сгибания ног сидя", 3, 10, 15, 2);
+    addAccessory_(rows, week, 2, "Бицепс штанга/EZ", 3, 8, 12, 2);
 
+    // День 3 — Жим (лёгкий/техничный) + плечи/руки + реабилитация
     addPlanRow_(rows, week, 3, "Жим лёжа пауза/узкий", 1, 6, 8, 2, "", 0.7);
     addPlanRow_(rows, week, 3, "Жим лёжа пауза/узкий", 2, 6, 8, 2, "", 0.7);
     addPlanRow_(rows, week, 3, "Жим лёжа пауза/узкий", 3, 6, 8, 2, "", 0.7);
-    addAccessory_(rows, week, 3, "Арнольд-пресс", 3, 10, 15, 2);
-    addAccessory_(rows, week, 3, "Махи в стороны (машина/кроссовер)", 3, 15, 25, 2);
-    addAccessory_(rows, week, 3, "Обратные разведения", 3, 15, 20, 2);
-    addAccessory_(rows, week, 3, "Разгибания ног (лёгк./BFR)", 3, 20, 30, 2);
-    addAccessory_(rows, week, 3, "Трицепс над головой (канат)", 2, 12, 20, 2);
-    addAccessory_(rows, week, 3, "Кроссовер на бицепс", 2, 12, 20, 2);
+    addAccessory_(rows, week, 3, "Арнольд-пресс", 3, 10, 12, 2);
+    addAccessory_(rows, week, 3, "Махи в стороны", 3, 15, 25, 2);
+    addAccessory_(rows, week, 3, "Обратные разведения (задняя дельта)", 3, 15, 20, 2);
+    addAccessory_(rows, week, 3, "Трицепс над головой (канат/гантель)", 3, 10, 15, 2);
+    addAccessory_(rows, week, 3, "Кабель на бицепс", 3, 10, 15, 2);
+    addAccessory_(rows, week, 3, "Quad-rehab (Reverse Sled Drag/TKE)", 3, 20, 30, 2);
 
-    addMainLift_(rows, week, 4, "Присед шир. стойка (бокс)", phase);
-    addAccessory_(rows, week, 4, "Тяга румынская", 3, 6, 10, 2);
+    // День 4 — Ноги (HSR, защищённый ROM) + задняя цепь
+    addMainLiftReduced_(rows, week, 4, "Присед широкой стойкой на бокс", phase, 3);
+    addAccessory_(rows, week, 4, "Румынская тяга", 3, 6, 10, 2);
     addAccessory_(rows, week, 4, "Жим ногами (ступни высоко)", 3, 12, 20, 2);
-    addAccessory_(rows, week, 4, "Икроножные", 3, 8, 12, 2);
+    addAccessory_(rows, week, 4, "Икры", 3, 8, 12, 2);
     addAccessory_(rows, week, 4, "Молотковые сгибания", 2, 10, 15, 2);
   });
 
@@ -517,6 +521,22 @@ function addMainLift_(rows, week, day, exercise, phase) {
 function addAccessory_(rows, week, day, exercise, sets, repMin, repMax, rir) {
   for (let i = 1; i <= sets; i++) {
     addPlanRow_(rows, week, day, exercise, i, repMin, repMax, rir, "", "");
+  }
+}
+
+function addMainLiftWithPct_(rows, week, day, exercise, sets, repMin, repMax, rir, pct) {
+  for (let i = 1; i <= sets; i++) {
+    addPlanRow_(rows, week, day, exercise, i, repMin, repMax, rir, "", pct);
+  }
+}
+
+function addMainLiftReduced_(rows, week, day, exercise, phase, backOffSets) {
+  const [topMin, topMax] = phase.topReps;
+  const [backMin, backMax] = phase.backReps;
+  
+  addPlanRow_(rows, week, day, exercise, 1, topMin, topMax, phase.topRir, "", phase.topPct);
+  for (let set = 2; set <= backOffSets + 1; set++) {
+    addPlanRow_(rows, week, day, exercise, set, backMin, backMax, phase.backRir, "", phase.backPct);
   }
 }
 
