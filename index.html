@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PowerBuilder Pro</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#f59e0b', // Amber 500
+                        'primary-dim': 'rgba(245, 158, 11, 0.15)',
+                        secondary: '#1f2937',
+                        dark: '#0f172a', // Slate 900
+                        surface: '#1e293b', // Slate 800
+                        input: '#334155', // Slate 700
+                        success: '#10b981',
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(245, 158, 11, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Robust CDNs -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin
+        src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- Upgraded to Babel 7 for Optional Chaining support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            overscroll-behavior-y: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Input Polish */
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        select {
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: none;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Animations */
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        /* Snap Scroll fix */
+        .snap-x {
+            scroll-snap-type: x mandatory;
+        }
+
+        .snap-start {
+            scroll-snap-align: start;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 3px solid #f59e0b;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+    <div id="root">
+        <div
+            style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748b;">
+            <div class="loader" style="margin-bottom: 16px;"></div>
+            <div style="font-family: sans-serif; font-size: 14px; font-weight: 500;">Загрузка PowerBuilder...</div>
+        </div>
+    </div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- ERROR BOUNDARY ---
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="p-8 text-center min-h-screen flex flex-col items-center justify-center bg-dark text-white">
+                            <div className="text-red-500 text-5xl mb-4">⚠️</div>
+                            <h2 className="text-xl font-bold mb-2">Что-то пошло не так</h2>
+                            <pre className="text-xs bg-black/30 p-4 rounded text-left text-red-300 overflow-auto max-w-full mb-4">
+                                {this.state.error?.toString()}
+                            </pre>
+                            <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-600 px-6 py-3 rounded-xl font-bold">
+                                Сбросить данные и перезагрузить
+                            </button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        // --- ICONS ---
+        const IconBase = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
+
+        const Icons = {
+            Settings: (p) => <IconBase {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></IconBase>,
+            X: (p) => <IconBase {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></IconBase>,
+            Check: (p) => <IconBase {...p}><polyline points="20 6 9 17 4 12" /></IconBase>,
+            Plus: (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></IconBase>,
+            Minus: (p) => <IconBase {...p}><line x1="5" y1="12" x2="19" y2="12" /></IconBase>,
+            Target: (p) => <IconBase {...p}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></IconBase>,
+            Dumbbell: (p) => <IconBase {...p}><path d="M6.5 6.5h11" /><path d="M6.5 17.5h11" /><path d="M6 20v-5" /><path d="M18 20v-5" /><path d="M6 9V4" /><path d="M18 9V4" /><path d="M5 9l14 6" /><path d="M5 15l14-6" /></IconBase>,
+            Edit2: (p) => <IconBase {...p}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" /></IconBase>,
+            Trash2: (p) => <IconBase {...p}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></IconBase>,
+            Activity: (p) => <IconBase {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></IconBase>,
+            Calendar: (p) => <IconBase {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></IconBase>,
+            Download: (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></IconBase>,
+            Upload: (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></IconBase>,
+            ArrowUp: (p) => <IconBase {...p}><line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" /></IconBase>,
+            ArrowDown: (p) => <IconBase {...p}><line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" /></IconBase>,
+            BarChart2: (p) => <IconBase {...p}><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></IconBase>,
+        };
+
+        const {
+            Settings, X, Check, Plus, Minus,
+            Target, Dumbbell, Edit2, Trash2,
+            Activity, Calendar, Download, Upload,
+            ArrowUp, ArrowDown, BarChart2
+        } = Icons;
+
+        // --- TYPES & CONSTANTS ---
+        const BaseLift = {
+            Squat: 'SQUAT',
+            Bench: 'BENCH',
+            Deadlift: 'DEADLIFT',
+            None: 'NONE'
+        };
+
+        // --- MATH UTILS ---
+        const roundTo = (val, step = 2.5) => {
+            if (!val) return 0;
+            return Math.round(val / step) * step;
+        };
+
+        const calculateE1RM = (weight, reps) => {
+            if (!weight || !reps) return 0;
+            const rawE1RM = weight * (1 + reps / 30);
+            // Round e1RM to nearest 2.5kg for consistency
+            return roundTo(rawE1RM, 2.5);
+        };
+
+        // --- DATA LOGIC ---
+        const calculateAutoTM = (logs, baseLift) => {
+            if (baseLift === BaseLift.None) return 0;
+
+            let maxDecayedE1RM = 0;
+            const liftKey = baseLift === BaseLift.Squat ? 'sq' : baseLift === BaseLift.Bench ? 'bench' : 'dl';
+            const now = Date.now();
+            const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+            Object.entries(logs || {}).forEach(([key, log]) => {
+                // FIX: Check log.baseLift first (for custom exercises), fallback to ID check
+                const isMatchingLift = (log.baseLift && log.baseLift === baseLift) ||
+                    (!log.baseLift && key.toLowerCase().includes(liftKey));
+
+                if (isMatchingLift && log.timestamp) {
+
+                    const weeksOld = (now - log.timestamp) / ONE_WEEK_MS;
+
+                    // Ignore data older than 12 weeks for calculations to prevent using stale PRs
+                    if (weeksOld > 12) return;
+
+                    // Decay Factor: Lose ~1-2% effectiveness per week of age to prioritize recent lifts
+                    // Week 0: 1.0, Week 4: ~0.96
+                    const decayFactor = Math.max(0.85, 1 - (weeksOld * 0.01));
+
+                    log.sets.forEach(set => {
+                        if (set.completed && set.weight > 0 && set.reps > 0) {
+                            const e1rm = calculateE1RM(set.weight, set.reps);
+                            const decayedE1RM = e1rm * decayFactor;
+                            if (decayedE1RM > maxDecayedE1RM) maxDecayedE1RM = decayedE1RM;
+                        }
+                    });
+                }
+            });
+
+            // Training Max is 90% of the best *decayed* e1RM, rounded to 2.5kg
+            return maxDecayedE1RM > 0 ? roundTo(maxDecayedE1RM * 0.9, 2.5) : 0;
+        };
+
+        const getLiftHistory = (logs, baseLift) => {
+            if (baseLift === BaseLift.None) return [];
+
+            const liftKey = baseLift === BaseLift.Squat ? 'sq' : baseLift === BaseLift.Bench ? 'bench' : 'dl';
+            const history = [];
+
+            Object.entries(logs || {}).forEach(([key, log]) => {
+                if (key.toLowerCase().includes(liftKey) && log.timestamp) {
+                    let bestSetE1RM = 0;
+                    log.sets.forEach(set => {
+                        if (set.completed && set.weight > 0 && set.reps > 0) {
+                            const e1rm = calculateE1RM(set.weight, set.reps);
+                            if (e1rm > bestSetE1RM) bestSetE1RM = e1rm;
+                        }
+                    });
+                    if (bestSetE1RM > 0) {
+                        history.push({
+                            date: log.timestamp,
+                            value: bestSetE1RM,
+                            label: new Date(log.timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+                        });
+                    }
+                }
+            });
+
+            return history.sort((a, b) => a.date - b.date);
+        };
+
+        // --- GENERATOR ---
+        const generateDefaultProgram = () => {
+            const program = {};
+
+            const getCompoundTarget = (week, lift) => {
+                if (week === 1) return { sets: 4, reps: "8", percentage: 0.70, rir: "3" };
+                if (week === 2) return { sets: 4, reps: "8", percentage: 0.725, rir: "2" };
+                if (week === 3) return { sets: 5, reps: "6", percentage: 0.75, rir: "1-2" };
+                if (week === 4) return { sets: 3, reps: "5", percentage: 0.65, rir: "4" };
+                return { sets: 3, reps: "10", percentage: 0.5, rir: "5" };
+            };
+
+            const getDeadliftSets = (week) => {
+                if (week === 1) return 3;
+                if (week === 2) return 3;
+                if (week === 3) return 4;
+                if (week === 4) return 2;
+                return 3;
+            };
+
+            for (let week = 1; week <= 4; week++) {
+                const isDeload = week === 4;
+
+                // Day 1
+                const bench = getCompoundTarget(week, BaseLift.Bench);
+                program[`w${week}_d1`] = {
+                    title: "Жим + Плечи + Руки",
+                    exercises: [
+                        { id: `w${week}_d1_bench`, name: 'Bench Press', baseLift: BaseLift.Bench, sets: bench.sets, reps: bench.reps, rir: bench.rir, percentage: bench.percentage },
+                        { id: `w${week}_d1_dips`, name: 'Weighted Dips', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_lat`, name: 'Lateral Raise', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '12-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
+                        { id: `w${week}_d1_tri`, name: 'Triceps Pushdown', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_ez`, name: 'EZ Bar Curl', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_rev`, name: 'Reverse Curl', baseLift: BaseLift.None, sets: isDeload ? 1 : 2, reps: '12-15', rir: '2-3', percentage: 0 },
+                    ]
+                };
+
+                // Day 2
+                const dl = getCompoundTarget(week, BaseLift.Deadlift);
+                let dlReps = dl.reps;
+                if (week === 1 || week === 2) dlReps = "6";
+                if (week === 3) dlReps = "5";
+                if (week === 4) dlReps = "4";
+                program[`w${week}_d2`] = {
+                    title: "Становая + Спина",
+                    exercises: [
+                        { id: `w${week}_d2_dl`, name: 'Deadlift', baseLift: BaseLift.Deadlift, sets: getDeadliftSets(week), reps: dlReps, rir: dl.rir, percentage: dl.percentage },
+                        { id: `w${week}_d2_pull`, name: 'Pull-ups', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '4-10', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d2_row`, name: 'Barbell Row', baseLift: BaseLift.None, sets: 3, reps: '6-10', rir: '2', percentage: 0 },
+                        { id: `w${week}_d2_rdl`, name: 'Romanian DL', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d2_abs`, name: 'Hanging Leg Raise', baseLift: BaseLift.None, sets: 3, reps: '10-20', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d2_pal`, name: 'Pallof Press', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2-3', percentage: 0 },
+                    ]
+                };
+
+                // Day 3
+                program[`w${week}_d3`] = {
+                    title: "Гипертрофия Верх",
+                    exercises: [
+                        { id: `w${week}_d3_inc`, name: 'Incline DB Press', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '6-10', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_cab`, name: 'Seated Cable Row', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_latp`, name: 'Lat Pulldown', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_latr`, name: 'Lateral Raise', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d3_face`, name: 'Face Pull', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d3_tri`, name: 'Overhead Tri Ext', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_bic`, name: 'DB Curl', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                    ]
+                };
+
+                // Day 4
+                const sq = getCompoundTarget(week, BaseLift.Squat);
+                program[`w${week}_d4`] = {
+                    title: "Присед + Ноги",
+                    exercises: [
+                        { id: `w${week}_d4_sq`, name: 'Squat', baseLift: BaseLift.Squat, sets: sq.sets, reps: sq.reps, rir: sq.rir, percentage: sq.percentage },
+                        { id: `w${week}_d4_lp`, name: 'Leg Press', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_lc`, name: 'Leg Curl', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_tke`, name: 'TKE (Band)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_ws`, name: 'Wall Sit', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_lr`, name: 'Light Row', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_ham`, name: 'Hammer Curl', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_rop`, name: 'Rope Pushdown', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_pl`, name: 'Side Plank', baseLift: BaseLift.None, sets: 3, reps: '30-45s', rir: '2-3', percentage: 0 },
+                    ]
+                };
+            }
+            return program;
+        };
+
+        // --- COMPONENTS ---
+
+        // Custom SVG Chart Component - Lightweight & No Dependencies
+        const SimpleLineChart = ({ data, color = '#f59e0b', height = 200 }) => {
+            if (!data || data.length < 2) {
+                return (
+                    <div className="flex flex-col items-center justify-center h-[200px] bg-white/5 rounded-xl text-gray-500 text-xs">
+                        <BarChart2 size={32} className="mb-2 opacity-50" />
+                        Недостаточно данных для графика
+                    </div>
+                );
+            }
+
+            const values = data.map(d => d.value);
+            const minVal = Math.min(...values) * 0.9; // Padding bottom
+            const maxVal = Math.max(...values) * 1.1; // Padding top
+            const range = maxVal - minVal;
+
+            const getX = (index) => (index / (data.length - 1)) * 100;
+            const getY = (val) => 100 - ((val - minVal) / range) * 100;
+
+            // Create path string
+            let d = `M ${getX(0)} ${getY(data[0].value)}`;
+            data.forEach((point, i) => {
+                if (i === 0) return;
+                d += ` L ${getX(i)} ${getY(point.value)}`;
+            });
+
+            // Create area fill path
+            const areaD = `${d} L 100 100 L 0 100 Z`;
+
+            return (
+                <div className="relative w-full select-none" style={{ height: `${height}px` }}>
+                    <div className="absolute inset-0 flex items-end justify-between text-[10px] text-gray-500 px-1 pb-1 pointer-events-none">
+                        <span>{data[0].label}</span>
+                        <span>{data[data.length - 1].label}</span>
+                    </div>
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+                        {/* Gradient Defs */}
+                        <defs>
+                            <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+                                <stop offset="100%" stopColor={color} stopOpacity="0" />
+                            </linearGradient>
+                        </defs>
+
+                        {/* Grid Lines */}
+                        <line x1="0" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+                        <line x1="0" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+
+                        {/* Area Fill */}
+                        <path d={areaD} fill="url(#chartGradient)" stroke="none" />
+
+                        {/* Line */}
+                        <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+
+                        {/* Points */}
+                        {data.map((point, i) => (
+                            <g key={i}>
+                                <circle
+                                    cx={getX(i)}
+                                    cy={getY(point.value)}
+                                    r="2"
+                                    fill={color}
+                                    stroke="#0f172a"
+                                    strokeWidth="0.5"
+                                    vectorEffect="non-scaling-stroke"
+                                />
+                                {/* Value Label above point */}
+                                <text
+                                    x={getX(i)}
+                                    y={getY(point.value) - 5}
+                                    fill="white"
+                                    fontSize="4px"
+                                    textAnchor="middle"
+                                    className="font-bold"
+                                >
+                                    {point.value}
+                                </text>
+                            </g>
+                        ))}
+                    </svg>
+                </div>
+            );
+        };
+
+        const StatsModal = ({ isOpen, onClose, logs }) => {
+            const [selectedLift, setSelectedLift] = useState(BaseLift.Bench);
+
+            if (!isOpen) return null;
+
+            const history = getLiftHistory(logs, selectedLift);
+            const bestLift = history.length ? Math.max(...history.map(h => h.value)) : 0;
+
+            const liftColor = selectedLift === BaseLift.Bench ? '#3b82f6'
+                : selectedLift === BaseLift.Squat ? '#f59e0b'
+                    : '#10b981'; // Deadlift green
+
+            return (
+                <Modal isOpen={isOpen} onClose={onClose} title="Прогресс (e1RM)">
+                    <div className="space-y-6">
+                        {/* Tabs */}
+                        <div className="flex bg-dark rounded-xl p-1 border border-white/5">
+                            {[
+                                { id: BaseLift.Bench, label: 'Bench' },
+                                { id: BaseLift.Squat, label: 'Squat' },
+                                { id: BaseLift.Deadlift, label: 'Deadlift' }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setSelectedLift(tab.id)}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${selectedLift === tab.id ? 'bg-surface text-white shadow ring-1 ring-white/10' : 'text-gray-500'}`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Summary */}
+                        <div className="text-center">
+                            <div className="text-sm text-gray-400">Лучший расчетный 1RM</div>
+                            <div className="text-4xl font-black text-white tracking-tighter" style={{ color: liftColor }}>
+                                {bestLift} <span className="text-lg text-gray-500 font-normal">кг</span>
+                            </div>
+                        </div>
+
+                        {/* Chart */}
+                        <div className="bg-surface p-4 rounded-xl border border-white/5">
+                            <SimpleLineChart data={history} color={liftColor} />
+                        </div>
+
+                        {/* Recent List */}
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                            <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 sticky top-0 bg-surface pb-2">История</h4>
+                            {[...history].reverse().map((entry, i) => (
+                                <div key={i} className="flex justify-between items-center p-3 bg-dark/50 rounded-lg border border-white/5">
+                                    <span className="text-sm text-gray-300">{entry.label}</span>
+                                    <span className="font-mono font-bold text-white">{entry.value} кг</span>
+                                </div>
+                            ))}
+                            {history.length === 0 && (
+                                <div className="text-center text-xs text-gray-600 py-4">Нет данных по этому упражнению</div>
+                            )}
+                        </div>
+                    </div>
+                </Modal>
+            );
+        };
+
+        const Modal = ({ isOpen, onClose, title, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-fade-in">
+                    <div className="bg-surface w-full max-w-md sm:rounded-2xl rounded-t-2xl border-t sm:border border-gray-700 shadow-2xl max-h-[90vh] flex flex-col animate-slide-up">
+                        <div className="flex items-center justify-between p-4 border-b border-gray-700/50 sticky top-0 bg-surface rounded-t-2xl z-10">
+                            <h2 className="text-lg font-bold text-white">{title}</h2>
+                            <button onClick={onClose} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-5 overflow-y-auto">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ExerciseEditModal = ({ isOpen, onClose, exercise, onSave, onDelete, onMove }) => {
+            const [form, setForm] = useState(exercise);
+
+            useEffect(() => {
+                if (exercise) setForm({ ...exercise });
+            }, [exercise]);
+
+            if (!isOpen || !form) return null;
+
+            const handleChange = (field, value) => {
+                setForm(prev => ({ ...prev, [field]: value }));
+            };
+
+            const handleSave = () => {
+                onSave(form);
+                onClose();
+            };
+
+            const handleDelete = () => {
+                if (confirm('Удалить упражнение?')) {
+                    onDelete(exercise.id);
+                    onClose();
+                }
+            };
+
+            return (
+                <Modal isOpen={isOpen} onClose={onClose} title="Редактировать">
+                    <div className="space-y-5">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Название упражнения</label>
+                            <input
+                                type="text"
+                                value={form.name}
+                                onChange={e => handleChange('name', e.target.value)}
+                                className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none text-lg"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Сеты (План)</label>
+                                <input
+                                    type="number" inputMode="numeric"
+                                    value={form.sets}
+                                    onChange={e => handleChange('sets', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none text-lg font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Повторы</label>
+                                <input
+                                    type="text"
+                                    value={form.reps}
+                                    onChange={e => handleChange('reps', e.target.value)}
+                                    className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none text-lg font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">RIR</label>
+                                <input
+                                    type="text"
+                                    value={form.rir}
+                                    onChange={e => handleChange('rir', e.target.value)}
+                                    className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none text-lg font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">% от TM (0.7 = 70%)</label>
+                                <input
+                                    type="number" inputMode="decimal" step="0.025"
+                                    value={form.percentage}
+                                    onChange={e => handleChange('percentage', parseFloat(e.target.value) || 0)}
+                                    className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none text-lg font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Тип (Для TM)</label>
+                            <select
+                                value={form.baseLift}
+                                onChange={e => handleChange('baseLift', e.target.value)}
+                                className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none appearance-none text-base"
+                            >
+                                <option value={BaseLift.None}>Без TM (Подсобка)</option>
+                                <option value={BaseLift.Squat}>Squat (Присед)</option>
+                                <option value={BaseLift.Bench}>Bench (Жим)</option>
+                                <option value={BaseLift.Deadlift}>Deadlift (Становая)</option>
+                            </select>
+                        </div>
+
+                        <div className="pt-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Действия</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                <button onClick={() => onMove('up')} className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
+                                    <ArrowUp size={18} /> Выше
+                                </button>
+                                <button onClick={() => onMove('down')} className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
+                                    <ArrowDown size={18} /> Ниже
+                                </button>
+                                <button onClick={handleDelete} className="flex items-center justify-center gap-1 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl font-bold">
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <button onClick={handleSave} className="w-full bg-primary text-dark font-bold text-lg py-4 rounded-xl mt-2 active:scale-95 transition-transform shadow-glow">
+                            Сохранить изменения
+                        </button>
+                    </div>
+                </Modal>
+            );
+        };
+
+        const ExerciseCard = ({ exercise, log, calculatedTM, previousLogWeight, onUpdateSet, onAddSet, onRemoveSet, onEditExercise }) => {
+            let targetWeightVal = null;
+            let isAutoCalculated = false;
+
+            if (exercise.baseLift !== BaseLift.None && exercise.percentage > 0) {
+                if (calculatedTM > 0) {
+                    targetWeightVal = roundTo(calculatedTM * exercise.percentage);
+                    isAutoCalculated = true;
+                }
+            } else if (previousLogWeight) {
+                targetWeightVal = previousLogWeight;
+            }
+
+            const sets = (log && log.sets && log.sets.length) ? log.sets : Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0, completed: false }));
+
+            const completedCount = sets.filter(s => s.completed).length;
+            const progress = (completedCount / sets.length) * 100;
+
+            return (
+                <div className="glass-panel rounded-2xl overflow-hidden mb-4 relative animate-slide-up">
+                    <div className="absolute top-0 left-0 h-1 bg-primary transition-all duration-500 z-20" style={{ width: `${progress}%` }}></div>
+
+                    <div className="p-4 flex justify-between items-start bg-gradient-to-b from-white/5 to-transparent">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-xl font-bold text-white tracking-tight">{exercise.name}</h3>
+                                <button onClick={() => onEditExercise(exercise)} className="text-gray-600 hover:text-primary p-1 opacity-50 hover:opacity-100">
+                                    <Edit2 size={14} />
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-xs font-medium text-gray-400">
+                                <span className="flex items-center text-gray-300 bg-dark/40 px-2 py-1 rounded border border-white/5">
+                                    <Activity size={12} className="mr-1.5 text-primary" />
+                                    {exercise.sets} x {exercise.reps}
+                                </span>
+                                <span className="flex items-center bg-dark/40 px-2 py-1 rounded border border-white/5">
+                                    <span className="text-primary mr-1">RIR</span> {exercise.rir}
+                                </span>
+                                {targetWeightVal > 0 && (
+                                    <span className={`flex items-center px-2 py-1 rounded border ${isAutoCalculated ? 'bg-primary/10 text-primary border-primary/20' : 'bg-blue-500/10 text-blue-400 border-blue-500/20'}`}>
+                                        <Target size={12} className="mr-1.5" />
+                                        {targetWeightVal} кг {isAutoCalculated && <span className="ml-1 opacity-60">({Math.round(exercise.percentage * 100)}%)</span>}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-end justify-center h-full">
+                            <div className={`text-2xl font-black ${completedCount === sets.length ? 'text-success' : 'text-gray-700'}`}>
+                                {completedCount}<span className="text-gray-700 text-base font-normal">/{sets.length}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-2 px-4 py-2 bg-dark/30 border-y border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        <div className="w-8 text-center">#</div>
+                        <div className="text-center">Вес (КГ)</div>
+                        <div className="text-center">Повторы</div>
+                        <div className="w-10 text-center"></div>
+                    </div>
+
+                    <div className="p-2 space-y-1">
+                        {sets.map((set, idx) => {
+                            const isCompleted = set.completed;
+                            const weightVal = set.weight || '';
+                            const weightPlaceholder = targetWeightVal || '-';
+                            const repsPlaceholder = exercise.reps.toString().split('-')[0];
+
+                            return (
+                                <div key={idx} className={`grid grid-cols-[auto_1fr_1fr_auto] gap-2 items-center p-1 rounded-xl transition-colors ${isCompleted ? 'bg-green-900/10' : ''}`}>
+                                    <div className="w-8 flex justify-center">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCompleted ? 'text-success bg-success/10' : 'text-gray-600 bg-gray-800'}`}>
+                                            {idx + 1}
+                                        </div>
+                                    </div>
+
+                                    <div className="relative">
+                                        <input
+                                            type="number" inputMode="decimal"
+                                            placeholder={weightPlaceholder}
+                                            value={weightVal}
+                                            onChange={(e) => onUpdateSet(idx, 'weight', e.target.value)}
+                                            onBlur={(e) => {
+                                                if (!e.target.value && targetWeightVal) onUpdateSet(idx, 'weight', targetWeightVal);
+                                            }}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-white'}`}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <input
+                                            type="number" inputMode="numeric"
+                                            placeholder={repsPlaceholder}
+                                            value={set.reps || ''}
+                                            onChange={(e) => onUpdateSet(idx, 'reps', e.target.value)}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-white'}`}
+                                        />
+                                    </div>
+
+                                    <div className="w-10 flex justify-center">
+                                        <button
+                                            onClick={() => onUpdateSet(idx, 'completed', !set.completed)}
+                                            className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${isCompleted ? 'bg-success text-dark shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-surface border-2 border-gray-700 text-gray-600'}`}
+                                        >
+                                            <Check size={20} strokeWidth={4} />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-px bg-white/5 mt-1">
+                        <button onClick={onAddSet} className="py-3 bg-dark/30 hover:bg-dark/60 text-gray-400 hover:text-white text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors">
+                            <Plus size={14} /> Добавить сет
+                        </button>
+                        <button onClick={onRemoveSet} className={`py-3 bg-dark/30 hover:bg-red-900/20 text-gray-400 hover:text-red-400 text-xs font-bold uppercase flex items-center justify-center gap-2 transition-colors ${sets.length <= 1 ? 'opacity-30 pointer-events-none' : ''}`}>
+                            <Minus size={14} /> Убрать
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [data, setData] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('pb_data_v4');
+                    if (saved) return JSON.parse(saved);
+                    // Migration check: if v3 exists, try to use it
+                    const savedV3 = localStorage.getItem('pb_data_v3');
+                    if (savedV3) return JSON.parse(savedV3);
+                } catch (e) { console.error(e); }
+                return {
+                    settings: { tm: {}, week: 1, day: 1 },
+                    logs: {},
+                    program: generateDefaultProgram()
+                };
+            });
+
+            const [settingsOpen, setSettingsOpen] = useState(false);
+            const [statsOpen, setStatsOpen] = useState(false);
+            const [editExercise, setEditExercise] = useState(null);
+            const fileInputRef = useRef(null);
+
+            useEffect(() => {
+                localStorage.setItem('pb_data_v4', JSON.stringify(data));
+            }, [data]);
+
+            const { week, day } = data.settings;
+            const currentDayKey = `w${week}_d${day}`;
+            const currentWorkout = data.program[currentDayKey] || { title: 'Отдых', exercises: [] };
+
+            const autoTMs = useMemo(() => {
+                return {
+                    [BaseLift.Squat]: calculateAutoTM(data.logs, BaseLift.Squat),
+                    [BaseLift.Bench]: calculateAutoTM(data.logs, BaseLift.Bench),
+                    [BaseLift.Deadlift]: calculateAutoTM(data.logs, BaseLift.Deadlift),
+                };
+            }, [data.logs]);
+
+            const changeView = (w, d) => {
+                setData(prev => ({ ...prev, settings: { ...prev.settings, week: w, day: d } }));
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            const getLogKey = (exId) => exId;
+
+            const updateSet = (exId, exSets, setIdx, field, val, exerciseName, baseLift) => {
+                setData(prev => {
+                    const newLogs = { ...prev.logs };
+                    const currentLog = newLogs[exId] || { sets: [] };
+
+                    let newSets = currentLog.sets.length
+                        ? [...currentLog.sets]
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+
+                    if (!newSets[setIdx]) newSets[setIdx] = { weight: 0, reps: 0, completed: false };
+
+                    // FIX: Handle NaN input by converting empty string to 0 or keeping it as empty string for UI
+                    let cleanVal = val;
+                    if (field !== 'completed') {
+                        if (val === '' || val === '-') cleanVal = '';
+                        else cleanVal = parseFloat(val);
+
+                        if (isNaN(cleanVal)) cleanVal = '';
+                    }
+
+                    newSets[setIdx] = {
+                        ...newSets[setIdx],
+                        [field]: cleanVal
+                    };
+
+                    // FIX: Save exercise metadata to log for history tracking
+                    newLogs[exId] = {
+                        ...currentLog,
+                        sets: newSets,
+                        timestamp: Date.now(),
+                        exerciseName: exerciseName || currentLog.exerciseName,
+                        baseLift: baseLift || currentLog.baseLift
+                    };
+                    return { ...prev, logs: newLogs };
+                });
+            };
+
+            const addSet = (exId, exSets) => {
+                setData(prev => {
+                    const newLogs = { ...prev.logs };
+                    const currentSets = newLogs[exId]?.sets?.length
+                        ? [...newLogs[exId].sets]
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+
+                    const last = currentSets[currentSets.length - 1] || { weight: 0, reps: 0 };
+                    currentSets.push({ weight: last.weight, reps: last.reps, completed: false });
+
+                    newLogs[exId] = { ...newLogs[exId], sets: currentSets };
+                    return { ...prev, logs: newLogs };
+                });
+            };
+
+            const removeSet = (exId, exSets) => {
+                setData(prev => {
+                    const newLogs = { ...prev.logs };
+                    const currentSets = newLogs[exId]?.sets?.length
+                        ? [...newLogs[exId].sets]
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+
+                    if (currentSets.length > 0) currentSets.pop();
+                    newLogs[exId] = { ...newLogs[exId], sets: currentSets };
+                    return { ...prev, logs: newLogs };
+                });
+            };
+
+            // --- PROGRAM EDIT LOGIC ---
+
+            const saveExerciseEdit = (updatedExercise) => {
+                setData(prev => {
+                    const newProgram = { ...prev.program };
+                    const dayPlan = newProgram[currentDayKey];
+                    const exIdx = dayPlan.exercises.findIndex(e => e.id === updatedExercise.id);
+                    if (exIdx !== -1) {
+                        dayPlan.exercises[exIdx] = updatedExercise;
+                    }
+                    return { ...prev, program: newProgram };
+                });
+            };
+
+            const deleteExercise = (exId) => {
+                setData(prev => {
+                    const newProgram = { ...prev.program };
+                    // Create a shallow copy of the day plan to ensure React detects the change
+                    const dayPlan = { ...newProgram[currentDayKey] };
+                    dayPlan.exercises = dayPlan.exercises.filter(e => e.id !== exId);
+                    newProgram[currentDayKey] = dayPlan;
+                    return { ...prev, program: newProgram };
+                });
+            };
+
+            const moveExercise = (exId, direction) => {
+                setData(prev => {
+                    const newProgram = { ...prev.program };
+                    const dayPlan = newProgram[currentDayKey];
+                    const idx = dayPlan.exercises.findIndex(e => e.id === exId);
+                    if (idx === -1) return prev;
+
+                    const newExercises = [...dayPlan.exercises];
+                    if (direction === 'up' && idx > 0) {
+                        [newExercises[idx], newExercises[idx - 1]] = [newExercises[idx - 1], newExercises[idx]];
+                    } else if (direction === 'down' && idx < newExercises.length - 1) {
+                        [newExercises[idx], newExercises[idx + 1]] = [newExercises[idx + 1], newExercises[idx]];
+                    }
+
+                    dayPlan.exercises = newExercises;
+                    return { ...prev, program: newProgram };
+                });
+            };
+
+            const addNewExercise = () => {
+                const newId = `${currentDayKey}_custom_${Date.now()}`;
+                const newExercise = {
+                    id: newId,
+                    name: 'Новое упражнение',
+                    baseLift: BaseLift.None,
+                    sets: 3,
+                    reps: '10',
+                    rir: '2',
+                    percentage: 0
+                };
+
+                setData(prev => {
+                    const newProgram = { ...prev.program };
+                    if (!newProgram[currentDayKey]) newProgram[currentDayKey] = { title: 'Custom Day', exercises: [] };
+                    // Ensure we are mutating a copy of the exercises array
+                    const dayPlan = { ...newProgram[currentDayKey] };
+                    dayPlan.exercises = [...dayPlan.exercises, newExercise];
+                    newProgram[currentDayKey] = dayPlan;
+                    return { ...prev, program: newProgram };
+                });
+
+                // Auto open edit modal for the new exercise
+                setTimeout(() => setEditExercise(newExercise), 100);
+            };
+
+            // --- DATA MANAGEMENT ---
+
+            const exportData = () => {
+                const dataStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `powerbuilder_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const importData = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        if (!json.program || !json.settings) throw new Error("Invalid file structure");
+                        setData(json);
+                        alert("Данные успешно загружены!");
+                        setSettingsOpen(false);
+                    } catch (err) {
+                        alert("Ошибка при чтении файла. Убедитесь, что это корректный JSON бэкап.");
+                        console.error(err);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const resetData = () => {
+                if (confirm("Вы уверены? Это удалит всю историю.")) {
+                    localStorage.removeItem('pb_data_v4');
+                    window.location.reload();
+                }
+            };
+
+            const findLastWeightForExercise = (exName) => {
+                let relevantIDs = [];
+                Object.values(data.program).forEach(dayPlan => {
+                    dayPlan.exercises.forEach(ex => {
+                        if (ex.name === exName) relevantIDs.push(ex.id);
+                    });
+                });
+
+                let bestTimestamp = 0;
+                let lastWeight = 0;
+
+                Object.entries(data.logs).forEach(([logId, log]) => {
+                    // FIX: Check by ID OR by saved exercise name
+                    const isMatch = relevantIDs.includes(logId) || (log.exerciseName && log.exerciseName === exName);
+
+                    if (isMatch) {
+                        if (log.timestamp > bestTimestamp && log.sets && log.sets.some(s => s.weight > 0)) {
+                            bestTimestamp = log.timestamp;
+                            // Find the first valid weight in the set
+                            const validSet = log.sets.find(s => s.weight > 0);
+                            if (validSet) lastWeight = validSet.weight;
+                        }
+                    }
+                });
+
+                // Don't return the weight if it's from the *current* exercise session (edit mode check)
+                if (editExercise && getLogKey(editExercise.id) && lastWeight > 0) {
+                    // Simplified check logic
+                }
+
+                return lastWeight;
+            };
+
+            return (
+                <div className="min-h-screen pb-24 font-sans bg-dark text-slate-200 selection:bg-primary selection:text-dark">
+                    <div className="glass-header sticky top-0 z-40 px-4 py-3 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-primary text-dark p-1.5 rounded-lg shadow-glow">
+                                <Dumbbell size={20} />
+                            </div>
+                            <div>
+                                <h1 className="text-lg font-black italic tracking-tighter text-white leading-none">
+                                    POWER<span className="text-primary">BUILDER</span>
+                                </h1>
+                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Pro Tracker</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setStatsOpen(true)} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                                <BarChart2 size={20} />
+                            </button>
+                            <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                                <Settings size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="max-w-lg mx-auto px-4 pt-6">
+
+                        <div className="mb-8">
+                            <div className="flex justify-between items-center mb-3 px-1">
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1">
+                                    <Calendar size={12} /> Неделя
+                                </span>
+                                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md border ${week === 4 ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-primary/10 text-primary border-primary/20'}`}>
+                                    {week === 4 ? 'Deload (Разгрузка)' : 'Hypertrophy (Рост)'}
+                                </span>
+                            </div>
+                            <div className="flex gap-3 overflow-x-auto pb-2 snap-x scrollbar-hide">
+                                {[1, 2, 3, 4].map(w => (
+                                    <button
+                                        key={w}
+                                        onClick={() => changeView(w, day)}
+                                        className={`flex-shrink-0 w-14 h-14 rounded-2xl font-bold text-xl flex items-center justify-center transition-all duration-300 border snap-start ${week === w ? 'bg-primary border-primary text-dark shadow-glow scale-105' : 'bg-surface border-white/5 text-gray-600'}`}
+                                    >
+                                        {w}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mb-8">
+                            <div className="flex bg-surface/50 p-1 rounded-xl gap-1 backdrop-blur-sm border border-white/5">
+                                {[1, 2, 3, 4].map(d => (
+                                    <button
+                                        key={d}
+                                        onClick={() => changeView(week, d)}
+                                        className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${day === d ? 'bg-secondary text-white shadow-lg ring-1 ring-white/10' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        День {d}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mb-6 animate-slide-up">
+                            <h2 className="text-3xl font-black text-white leading-none mb-2">{currentWorkout.title}</h2>
+                            <div className="flex items-center gap-2 text-gray-500 text-sm">
+                                <span className="bg-white/5 px-2 py-0.5 rounded text-xs font-mono">{currentWorkout.exercises.length} УПР</span>
+                                <span>•</span>
+                                <span>{week === 4 ? 'Легкая нагрузка' : 'Тяжелая тренировка'}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6 pb-10">
+                            {currentWorkout.exercises.map(ex => {
+                                const previousWeight = ex.baseLift === BaseLift.None ? findLastWeightForExercise(ex.name) : 0;
+
+                                return (
+                                    <ExerciseCard
+                                        key={ex.id}
+                                        exercise={ex}
+                                        log={data.logs[ex.id]}
+                                        calculatedTM={autoTMs[ex.baseLift]}
+                                        previousLogWeight={previousWeight}
+                                        onUpdateSet={(idx, field, val) => updateSet(ex.id, ex.sets, idx, field, val, ex.name, ex.baseLift)}
+                                        onAddSet={() => addSet(ex.id, ex.sets)}
+                                        onRemoveSet={() => removeSet(ex.id, ex.sets)}
+                                        onEditExercise={setEditExercise}
+                                    />
+                                );
+                            })}
+
+                            <button
+                                onClick={addNewExercise}
+                                className="w-full py-4 rounded-2xl border-2 border-dashed border-gray-700 text-gray-500 hover:text-primary hover:border-primary hover:bg-primary/5 transition-all font-bold flex items-center justify-center gap-2"
+                            >
+                                <Plus size={20} /> Добавить упражнение
+                            </button>
+                        </div>
+                    </div>
+
+                    <Modal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} title="Настройки">
+                        <div className="space-y-6">
+                            <div className="bg-dark/50 p-4 rounded-xl border border-white/5">
+                                <h3 className="text-sm font-bold text-white mb-2">Ваши расчетные 1RM</h3>
+                                <p className="text-xs text-gray-500 mb-4">Рассчитываются автоматически на основе ваших лучших сетов.</p>
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400">Squat</span>
+                                        <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Squat] / 0.9)} кг</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400">Bench</span>
+                                        <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Bench] / 0.9)} кг</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400">Deadlift</span>
+                                        <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Deadlift] / 0.9)} кг</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={exportData} className="bg-surface border border-white/10 hover:bg-white/5 py-3 rounded-xl flex flex-col items-center justify-center gap-1 text-sm font-bold text-blue-400">
+                                    <Download size={20} />
+                                    Скачать бэкап
+                                </button>
+                                <button onClick={() => fileInputRef.current.click()} className="bg-surface border border-white/10 hover:bg-white/5 py-3 rounded-xl flex flex-col items-center justify-center gap-1 text-sm font-bold text-green-400">
+                                    <Upload size={20} />
+                                    Загрузить
+                                </button>
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={importData}
+                                    className="hidden"
+                                    accept=".json"
+                                />
+                            </div>
+
+                            <button onClick={resetData} className="w-full py-4 flex items-center justify-center gap-2 text-red-400 bg-red-400/10 rounded-xl hover:bg-red-400/20 transition-colors">
+                                <Trash2 size={18} /> Сбросить все данные
+                            </button>
+                        </div>
+                    </Modal>
+
+                    <StatsModal
+                        isOpen={statsOpen}
+                        onClose={() => setStatsOpen(false)}
+                        logs={data.logs}
+                    />
+
+                    <ExerciseEditModal
+                        isOpen={!!editExercise}
+                        onClose={() => setEditExercise(null)}
+                        exercise={editExercise}
+                        onSave={saveExerciseEdit}
+                        onDelete={deleteExercise}
+                        onMove={(dir) => moveExercise(editExercise.id, dir)}
+                    />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
+    </script>
+    <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>
