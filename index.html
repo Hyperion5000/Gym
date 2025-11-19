@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>PowerBuilder Pro</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -936,6 +937,10 @@
             // --- PROGRAM EDIT LOGIC ---
 
             const saveExerciseEdit = (updatedExercise) => {
+                if (!updatedExercise.name || !updatedExercise.name.trim()) {
+                    alert("Название упражнения не может быть пустым");
+                    return;
+                }
                 setData(prev => {
                     const newProgram = { ...prev.program };
                     const dayPlan = newProgram[currentDayKey];
@@ -1242,7 +1247,7 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
-    <script type="module" src="/index.tsx"></script>
+
 </body>
 
 </html>
