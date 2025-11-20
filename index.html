@@ -270,11 +270,10 @@
             const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
             Object.entries(logs || {}).forEach(([key, log]) => {
-                // FIX: Check log.baseLift first (for custom exercises), fallback to ID check
                 const isMatchingLift = (log.baseLift && log.baseLift === baseLift) ||
                     (!log.baseLift && key.toLowerCase().includes(liftKey));
 
-                // FIX: Handle missing timestamp by defaulting to now (assume recent if missing) or skipping
+                // Handle missing timestamp by defaulting to now (assume recent if missing) or skipping
                 // For safety, if no timestamp, we assume it's old data or migration artifact, but let's use 0 to be safe and rely on checks
                 const logTime = log.timestamp || 0;
 
@@ -437,7 +436,7 @@
             const maxVal = Math.max(...values) * 1.1; // Padding top
             let range = maxVal - minVal;
 
-            // FIX: Prevent divide by zero if all values are the same
+            // Prevent divide by zero if all values are the same
             if (range === 0) range = 1;
 
             const getX = (index) => (index / (data.length - 1)) * 100;
@@ -887,7 +886,7 @@
 
                     if (!newSets[setIdx]) newSets[setIdx] = { weight: 0, reps: 0, completed: false };
 
-                    // FIX: Handle NaN input by converting empty string to 0 or keeping it as empty string for UI
+                    // Handle NaN input by converting empty string to 0 or keeping it as empty string for UI
                     let cleanVal = val;
                     if (field !== 'completed') {
                         if (val === '' || val === '-') cleanVal = '';
@@ -901,7 +900,7 @@
                         [field]: cleanVal
                     };
 
-                    // FIX: Save exercise metadata to log for history tracking
+                    // Save exercise metadata to log for history tracking
                     newLogs[exId] = {
                         ...currentLog,
                         sets: newSets,
@@ -1068,7 +1067,7 @@
                 let lastWeight = 0;
 
                 Object.entries(data.logs).forEach(([logId, log]) => {
-                    // FIX: Check by ID OR by saved exercise name
+                    // Check by ID OR by saved exercise name
                     const isMatch = relevantIDs.includes(logId) || (log.exerciseName && log.exerciseName === exName);
 
                     if (isMatch) {
