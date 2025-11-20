@@ -165,7 +165,6 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="/index.css">
 </head>
 
 <body>
@@ -409,8 +408,8 @@
                         { id: `w${week}_d4_tke`, name: 'Разгибания ног (резина)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
                         { id: `w${week}_d4_ws`, name: 'Стульчик', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
                         { id: `w${week}_d4_lr`, name: 'Легкая тяга', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_ham`, name: 'Молот', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_rop`, name: 'Разгибания с канатом', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_ham`, name: 'Молот', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_rop`, name: 'Разгибания с канатом', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
 
                     ]
                 };
@@ -1079,11 +1078,6 @@
                         }
                     }
                 });
-
-                // Don't return the weight if it's from the *current* exercise session (edit mode check)
-                if (editExercise && getLogKey(editExercise.id) && lastWeight > 0) {
-                    // Simplified check logic
-                }
 
                 return lastWeight;
             };
