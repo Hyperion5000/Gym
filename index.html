@@ -274,9 +274,13 @@
                 const isMatchingLift = (log.baseLift && log.baseLift === baseLift) ||
                     (!log.baseLift && key.toLowerCase().includes(liftKey));
 
-                if (isMatchingLift && log.timestamp) {
+                // FIX: Handle missing timestamp by defaulting to now (assume recent if missing) or skipping
+                // For safety, if no timestamp, we assume it's old data or migration artifact, but let's use 0 to be safe and rely on checks
+                const logTime = log.timestamp || 0;
 
-                    const weeksOld = (now - log.timestamp) / ONE_WEEK_MS;
+                if (isMatchingLift && logTime > 0) {
+
+                    const weeksOld = (now - logTime) / ONE_WEEK_MS;
 
                     // Ignore data older than 12 weeks for calculations to prevent using stale PRs
                     if (weeksOld > 12) return;
@@ -355,12 +359,12 @@
                 program[`w${week}_d1`] = {
                     title: "Жим + Плечи + Руки",
                     exercises: [
-                        { id: `w${week}_d1_bench`, name: 'Bench Press', baseLift: BaseLift.Bench, sets: bench.sets, reps: bench.reps, rir: bench.rir, percentage: bench.percentage },
-                        { id: `w${week}_d1_dips`, name: 'Weighted Dips', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d1_lat`, name: 'Lateral Raise', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '12-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
-                        { id: `w${week}_d1_tri`, name: 'Triceps Pushdown', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d1_ez`, name: 'EZ Bar Curl', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d1_rev`, name: 'Reverse Curl', baseLift: BaseLift.None, sets: isDeload ? 1 : 2, reps: '12-15', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d1_bench`, name: 'Жим лежа', baseLift: BaseLift.Bench, sets: bench.sets, reps: bench.reps, rir: bench.rir, percentage: bench.percentage },
+                        { id: `w${week}_d1_dips`, name: 'Отжимания на брусьях', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_lat`, name: 'Махи в стороны', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '12-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
+                        { id: `w${week}_d1_tri`, name: 'Разгибания на трицепс', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_ez`, name: 'Сгибания с EZ-грифом', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_rev`, name: 'Обратные сгибания', baseLift: BaseLift.None, sets: isDeload ? 1 : 2, reps: '12-15', rir: '2-3', percentage: 0 },
                     ]
                 };
 
@@ -373,12 +377,11 @@
                 program[`w${week}_d2`] = {
                     title: "Становая + Спина",
                     exercises: [
-                        { id: `w${week}_d2_dl`, name: 'Deadlift', baseLift: BaseLift.Deadlift, sets: getDeadliftSets(week), reps: dlReps, rir: dl.rir, percentage: dl.percentage },
-                        { id: `w${week}_d2_pull`, name: 'Pull-ups', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '4-10', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d2_row`, name: 'Barbell Row', baseLift: BaseLift.None, sets: 3, reps: '6-10', rir: '2', percentage: 0 },
-                        { id: `w${week}_d2_rdl`, name: 'Romanian DL', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d2_abs`, name: 'Hanging Leg Raise', baseLift: BaseLift.None, sets: 3, reps: '10-20', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d2_pal`, name: 'Pallof Press', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d2_dl`, name: 'Становая тяга', baseLift: BaseLift.Deadlift, sets: getDeadliftSets(week), reps: dlReps, rir: dl.rir, percentage: dl.percentage },
+                        { id: `w${week}_d2_pull`, name: 'Подтягивания', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '4-10', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d2_row`, name: 'Тяга в наклоне', baseLift: BaseLift.None, sets: 3, reps: '6-10', rir: '2', percentage: 0 },
+                        { id: `w${week}_d2_rdl`, name: 'Румынская тяга', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+
                     ]
                 };
 
@@ -386,13 +389,13 @@
                 program[`w${week}_d3`] = {
                     title: "Гипертрофия Верх",
                     exercises: [
-                        { id: `w${week}_d3_inc`, name: 'Incline DB Press', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '6-10', rir: '2', percentage: 0 },
-                        { id: `w${week}_d3_cab`, name: 'Seated Cable Row', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d3_latp`, name: 'Lat Pulldown', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d3_latr`, name: 'Lateral Raise', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d3_face`, name: 'Face Pull', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d3_tri`, name: 'Overhead Tri Ext', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d3_bic`, name: 'DB Curl', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_inc`, name: 'Жим гантелей наклонный', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '6-10', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_cab`, name: 'Тяга блока сидя', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_latp`, name: 'Тяга верхнего блока', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_latr`, name: 'Махи в стороны', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d3_face`, name: 'Лицевая тяга', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d3_tri`, name: 'Разгибания из-за головы', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d3_bic`, name: 'Сгибания с гантелями', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
                     ]
                 };
 
@@ -401,15 +404,15 @@
                 program[`w${week}_d4`] = {
                     title: "Присед + Ноги",
                     exercises: [
-                        { id: `w${week}_d4_sq`, name: 'Squat', baseLift: BaseLift.Squat, sets: sq.sets, reps: sq.reps, rir: sq.rir, percentage: sq.percentage },
-                        { id: `w${week}_d4_lp`, name: 'Leg Press', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_lc`, name: 'Leg Curl', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_tke`, name: 'TKE (Band)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
-                        { id: `w${week}_d4_ws`, name: 'Wall Sit', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
-                        { id: `w${week}_d4_lr`, name: 'Light Row', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_ham`, name: 'Hammer Curl', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_rop`, name: 'Rope Pushdown', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_pl`, name: 'Side Plank', baseLift: BaseLift.None, sets: 3, reps: '30-45s', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d4_sq`, name: 'Приседания', baseLift: BaseLift.Squat, sets: sq.sets, reps: sq.reps, rir: sq.rir, percentage: sq.percentage },
+                        { id: `w${week}_d4_lp`, name: 'Жим ногами', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_lc`, name: 'Сгибания ног', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_tke`, name: 'Разгибания ног (резина)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_ws`, name: 'Стульчик', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_lr`, name: 'Легкая тяга', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_ham`, name: 'Молот', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_rop`, name: 'Разгибания с канатом', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+
                     ]
                 };
             }
@@ -432,7 +435,10 @@
             const values = data.map(d => d.value);
             const minVal = Math.min(...values) * 0.9; // Padding bottom
             const maxVal = Math.max(...values) * 1.1; // Padding top
-            const range = maxVal - minVal;
+            let range = maxVal - minVal;
+
+            // FIX: Prevent divide by zero if all values are the same
+            if (range === 0) range = 1;
 
             const getX = (index) => (index / (data.length - 1)) * 100;
             const getY = (val) => 100 - ((val - minVal) / range) * 100;
@@ -521,9 +527,9 @@
                         {/* Tabs */}
                         <div className="flex bg-dark rounded-xl p-1 border border-white/5">
                             {[
-                                { id: BaseLift.Bench, label: 'Bench' },
-                                { id: BaseLift.Squat, label: 'Squat' },
-                                { id: BaseLift.Deadlift, label: 'Deadlift' }
+                                { id: BaseLift.Bench, label: 'Жим' },
+                                { id: BaseLift.Squat, label: 'Присед' },
+                                { id: BaseLift.Deadlift, label: 'Становая' }
                             ].map(tab => (
                                 <button
                                     key={tab.id}
@@ -573,7 +579,7 @@
                     <div className="bg-surface w-full max-w-md sm:rounded-2xl rounded-t-2xl border-t sm:border border-gray-700 shadow-2xl max-h-[90vh] flex flex-col animate-slide-up">
                         <div className="flex items-center justify-between p-4 border-b border-gray-700/50 sticky top-0 bg-surface rounded-t-2xl z-10">
                             <h2 className="text-lg font-bold text-white">{title}</h2>
-                            <button onClick={onClose} className="p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-colors">
+                            <button onClick={onClose} aria-label="Закрыть" className="p-2 bg-gray-800 hover:bg-gray-700 rounded-full text-gray-400 hover:text-white transition-colors">
                                 <X size={20} />
                             </button>
                         </div>
@@ -673,22 +679,22 @@
                                 className="w-full bg-dark border border-gray-700 rounded-xl px-4 py-3.5 text-white focus:border-primary focus:outline-none appearance-none text-base"
                             >
                                 <option value={BaseLift.None}>Без TM (Подсобка)</option>
-                                <option value={BaseLift.Squat}>Squat (Присед)</option>
-                                <option value={BaseLift.Bench}>Bench (Жим)</option>
-                                <option value={BaseLift.Deadlift}>Deadlift (Становая)</option>
+                                <option value={BaseLift.Squat}>Присед</option>
+                                <option value={BaseLift.Bench}>Жим</option>
+                                <option value={BaseLift.Deadlift}>Становая</option>
                             </select>
                         </div>
 
                         <div className="pt-2">
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Действия</label>
                             <div className="grid grid-cols-3 gap-2">
-                                <button onClick={() => onMove('up')} className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
+                                <button onClick={() => onMove('up')} aria-label="Переместить выше" className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
                                     <ArrowUp size={18} /> Выше
                                 </button>
-                                <button onClick={() => onMove('down')} className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
+                                <button onClick={() => onMove('down')} aria-label="Переместить ниже" className="flex items-center justify-center gap-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl font-bold text-gray-200">
                                     <ArrowDown size={18} /> Ниже
                                 </button>
-                                <button onClick={handleDelete} className="flex items-center justify-center gap-1 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl font-bold">
+                                <button onClick={handleDelete} aria-label="Удалить упражнение" className="flex items-center justify-center gap-1 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl font-bold">
                                     <Trash2 size={18} />
                                 </button>
                             </div>
@@ -728,7 +734,7 @@
                         <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                                 <h3 className="text-xl font-bold text-white tracking-tight">{exercise.name}</h3>
-                                <button onClick={() => onEditExercise(exercise)} className="text-gray-600 hover:text-primary p-1 opacity-50 hover:opacity-100">
+                                <button onClick={() => onEditExercise(exercise)} aria-label="Редактировать упражнение" className="text-gray-600 hover:text-primary p-1 opacity-50 hover:opacity-100">
                                     <Edit2 size={14} />
                                 </button>
                             </div>
@@ -803,6 +809,7 @@
                                     <div className="w-10 flex justify-center">
                                         <button
                                             onClick={() => onUpdateSet(idx, 'completed', !set.completed)}
+                                            aria-label={isCompleted ? "Отметить как невыполненное" : "Отметить как выполненное"}
                                             className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all active:scale-90 ${isCompleted ? 'bg-success text-dark shadow-[0_0_10px_rgba(16,185,129,0.4)]' : 'bg-surface border-2 border-gray-700 text-gray-600'}`}
                                         >
                                             <Check size={20} strokeWidth={4} />
@@ -996,7 +1003,7 @@
 
                 setData(prev => {
                     const newProgram = { ...prev.program };
-                    if (!newProgram[currentDayKey]) newProgram[currentDayKey] = { title: 'Custom Day', exercises: [] };
+                    if (!newProgram[currentDayKey]) newProgram[currentDayKey] = { title: 'Свой день', exercises: [] };
                     // Ensure we are mutating a copy of the exercises array
                     const dayPlan = { ...newProgram[currentDayKey] };
                     dayPlan.exercises = [...dayPlan.exercises, newExercise];
@@ -1097,10 +1104,10 @@
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => setStatsOpen(true)} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                            <button onClick={() => setStatsOpen(true)} aria-label="Статистика" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
                                 <BarChart2 size={20} />
                             </button>
-                            <button onClick={() => setSettingsOpen(true)} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                            <button onClick={() => setSettingsOpen(true)} aria-label="Настройки" className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
                                 <Settings size={20} />
                             </button>
                         </div>
@@ -1114,7 +1121,7 @@
                                     <Calendar size={12} /> Неделя
                                 </span>
                                 <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md border ${week === 4 ? 'bg-green-900/20 text-green-400 border-green-900/30' : 'bg-primary/10 text-primary border-primary/20'}`}>
-                                    {week === 4 ? 'Deload (Разгрузка)' : 'Hypertrophy (Рост)'}
+                                    {week === 4 ? 'Разгрузка' : 'Гипертрофия'}
                                 </span>
                             </div>
                             <div className="flex gap-3 overflow-x-auto pb-2 snap-x scrollbar-hide">
@@ -1188,15 +1195,15 @@
                                 <p className="text-xs text-gray-500 mb-4">Рассчитываются автоматически на основе ваших лучших сетов.</p>
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Squat</span>
+                                        <span className="text-gray-400">Присед</span>
                                         <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Squat] / 0.9)} кг</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Bench</span>
+                                        <span className="text-gray-400">Жим</span>
                                         <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Bench] / 0.9)} кг</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-gray-400">Deadlift</span>
+                                        <span className="text-gray-400">Становая</span>
                                         <span className="text-primary font-mono font-bold">{Math.round(autoTMs[BaseLift.Deadlift] / 0.9)} кг</span>
                                     </div>
                                 </div>
