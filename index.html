@@ -48,6 +48,11 @@
             overscroll-behavior-y: none;
         }
 
+        /* iPhone Home Indicator spacing */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 4px;
@@ -94,6 +99,7 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: env(safe-area-inset-top);
         }
 
         /* Animations */
@@ -252,9 +258,10 @@
             return Math.round(val / step) * step;
         };
 
-        const calculateE1RM = (weight, reps) => {
+        const calculateE1RM = (weight, reps, rir = 0) => {
             if (!weight || !reps) return 0;
-            const rawE1RM = weight * (1 + reps / 30);
+            const rirVal = parseFloat(rir) || 0;
+            const rawE1RM = weight * (1 + (reps + rirVal) / 30);
             // Round e1RM to nearest 2.5kg for consistency
             return roundTo(rawE1RM, 2.5);
         };
@@ -289,7 +296,7 @@
 
                     log.sets.forEach(set => {
                         if (set.completed && set.weight > 0 && set.reps > 0) {
-                            const e1rm = calculateE1RM(set.weight, set.reps);
+                            const e1rm = calculateE1RM(set.weight, set.reps, set.actualRIR);
                             const decayedE1RM = e1rm * decayFactor;
                             if (decayedE1RM > maxDecayedE1RM) maxDecayedE1RM = decayedE1RM;
                         }
@@ -312,7 +319,7 @@
                     let bestSetE1RM = 0;
                     log.sets.forEach(set => {
                         if (set.completed && set.weight > 0 && set.reps > 0) {
-                            const e1rm = calculateE1RM(set.weight, set.reps);
+                            const e1rm = calculateE1RM(set.weight, set.reps, set.actualRIR);
                             if (e1rm > bestSetE1RM) bestSetE1RM = e1rm;
                         }
                     });
@@ -404,6 +411,7 @@
                     exercises: [
                         { id: `w${week}_d4_sq`, name: 'Приседания', baseLift: BaseLift.Squat, sets: sq.sets, reps: sq.reps, rir: sq.rir, percentage: sq.percentage },
                         { id: `w${week}_d4_lp`, name: 'Жим ногами', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_alf`, name: 'Приседания Альфредсона', baseLift: BaseLift.None, sets: 3, reps: '12-15', rir: '2-3', percentage: 0 },
                         { id: `w${week}_d4_lc`, name: 'Сгибания ног', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
                         { id: `w${week}_d4_tke`, name: 'Разгибания ног (резина)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
                         { id: `w${week}_d4_ws`, name: 'Стульчик', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
@@ -719,7 +727,7 @@
                 targetWeightVal = previousLogWeight;
             }
 
-            const sets = (log && log.sets && log.sets.length) ? log.sets : Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0, completed: false }));
+            const sets = (log && log.sets && log.sets.length) ? log.sets : Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
 
             const completedCount = sets.filter(s => s.completed).length;
             const progress = (completedCount / sets.length) * 100;
@@ -759,10 +767,11 @@
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-[auto_1fr_1fr_auto] gap-2 px-4 py-2 bg-dark/30 border-y border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                    <div className="grid grid-cols-[auto_1fr_1fr_0.5fr_auto] gap-2 px-4 py-2 bg-dark/30 border-y border-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                         <div className="w-8 text-center">#</div>
                         <div className="text-center">Вес (КГ)</div>
                         <div className="text-center">Повторы</div>
+                        <div className="text-center">RIR</div>
                         <div className="w-10 text-center"></div>
                     </div>
 
@@ -774,7 +783,7 @@
                             const repsPlaceholder = exercise.reps.toString().split('-')[0];
 
                             return (
-                                <div key={idx} className={`grid grid-cols-[auto_1fr_1fr_auto] gap-2 items-center p-1 rounded-xl transition-colors ${isCompleted ? 'bg-green-900/10' : ''}`}>
+                                <div key={idx} className={`grid grid-cols-[auto_1fr_1fr_0.5fr_auto] gap-2 items-center p-1 rounded-xl transition-colors ${isCompleted ? 'bg-green-900/10' : ''}`}>
                                     <div className="w-8 flex justify-center">
                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCompleted ? 'text-success bg-success/10' : 'text-gray-600 bg-gray-800'}`}>
                                             {idx + 1}
@@ -801,6 +810,17 @@
                                             value={set.reps || ''}
                                             onChange={(e) => onUpdateSet(idx, 'reps', e.target.value)}
                                             className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-white'}`}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <input
+                                            type="number" inputMode="numeric"
+                                            placeholder="RIR"
+                                            value={set.actualRIR || ''}
+                                            onChange={(e) => onUpdateSet(idx, 'actualRIR', e.target.value)}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-gray-400'}`}
+                                            style={{ fontSize: '0.9rem' }}
                                         />
                                     </div>
 
@@ -881,9 +901,9 @@
 
                     let newSets = currentLog.sets.length
                         ? [...currentLog.sets]
-                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
 
-                    if (!newSets[setIdx]) newSets[setIdx] = { weight: 0, reps: 0, completed: false };
+                    if (!newSets[setIdx]) newSets[setIdx] = { weight: 0, reps: 0, actualRIR: '', completed: false };
 
                     // Handle NaN input by converting empty string to 0 or keeping it as empty string for UI
                     let cleanVal = val;
@@ -916,10 +936,10 @@
                     const newLogs = { ...prev.logs };
                     const currentSets = newLogs[exId]?.sets?.length
                         ? [...newLogs[exId].sets]
-                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
 
-                    const last = currentSets[currentSets.length - 1] || { weight: 0, reps: 0 };
-                    currentSets.push({ weight: last.weight, reps: last.reps, completed: false });
+                    const last = currentSets[currentSets.length - 1] || { weight: 0, reps: 0, actualRIR: '' };
+                    currentSets.push({ weight: last.weight, reps: last.reps, actualRIR: '', completed: false });
 
                     newLogs[exId] = { ...newLogs[exId], sets: currentSets };
                     return { ...prev, logs: newLogs };
@@ -931,7 +951,7 @@
                     const newLogs = { ...prev.logs };
                     const currentSets = newLogs[exId]?.sets?.length
                         ? [...newLogs[exId].sets]
-                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, completed: false }));
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
 
                     if (currentSets.length > 0) currentSets.pop();
                     newLogs[exId] = { ...newLogs[exId], sets: currentSets };
@@ -1070,11 +1090,15 @@
                     const isMatch = relevantIDs.includes(logId) || (log.exerciseName && log.exerciseName === exName);
 
                     if (isMatch) {
-                        if (log.timestamp > bestTimestamp && log.sets && log.sets.some(s => s.weight > 0)) {
+                        if (log.timestamp > bestTimestamp && log.sets && log.sets.some(s => s.weight > 0 && s.completed)) {
                             bestTimestamp = log.timestamp;
-                            // Find the first valid weight in the set
-                            const validSet = log.sets.find(s => s.weight > 0);
-                            if (validSet) lastWeight = validSet.weight;
+
+                            // Calculate average weight of completed sets
+                            const completedSets = log.sets.filter(s => s.weight > 0 && s.completed);
+                            if (completedSets.length > 0) {
+                                const totalWeight = completedSets.reduce((sum, s) => sum + parseFloat(s.weight), 0);
+                                lastWeight = roundTo(totalWeight / completedSets.length, 0.5); // Round to nearest 0.5kg
+                            }
                         }
                     }
                 });
@@ -1083,7 +1107,7 @@
             };
 
             return (
-                <div className="min-h-screen pb-24 font-sans bg-dark text-slate-200 selection:bg-primary selection:text-dark">
+                <div className="min-h-screen pb-24 pb-safe font-sans bg-dark text-slate-200 selection:bg-primary selection:text-dark">
                     <div className="glass-header sticky top-0 z-40 px-4 py-3 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="bg-primary text-dark p-1.5 rounded-lg shadow-glow">
