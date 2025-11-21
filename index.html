@@ -99,7 +99,8 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-top: env(safe-area-inset-top);
+            padding-top: calc(env(safe-area-inset-top) + 12px);
+            padding-bottom: 12px;
         }
 
         /* Animations */
@@ -264,6 +265,14 @@
             const rawE1RM = weight * (1 + (reps + rirVal) / 30);
             // Round e1RM to nearest 2.5kg for consistency
             return roundTo(rawE1RM, 2.5);
+        };
+
+        const getDefaultRIR = (rir) => {
+            if (!rir) return '';
+            const s = String(rir).trim();
+            if (s.includes('-')) return '';
+            const n = parseFloat(s);
+            return isNaN(n) ? '' : n;
         };
 
         // --- DATA LOGIC ---
@@ -727,7 +736,7 @@
                 targetWeightVal = previousLogWeight;
             }
 
-            const sets = (log && log.sets && log.sets.length) ? log.sets : Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
+            const sets = (log && log.sets && log.sets.length) ? log.sets : Array.from({ length: exercise.sets }, () => ({ weight: 0, reps: 0, actualRIR: getDefaultRIR(exercise.rir), completed: false }));
 
             const completedCount = sets.filter(s => s.completed).length;
             const progress = (completedCount / sets.length) * 100;
@@ -795,11 +804,13 @@
                                             type="number" inputMode="decimal"
                                             placeholder={weightPlaceholder}
                                             value={weightVal}
+                                            disabled={isCompleted}
                                             onChange={(e) => onUpdateSet(idx, 'weight', e.target.value)}
                                             onBlur={(e) => {
                                                 if (!e.target.value && targetWeightVal) onUpdateSet(idx, 'weight', targetWeightVal);
                                             }}
-                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-white'}`}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all disabled:opacity-60 ${isCompleted ? 'text-success' : 'text-white'}`}
+                                            style={isCompleted ? { WebkitTextFillColor: '#10b981' } : {}}
                                         />
                                     </div>
 
@@ -808,8 +819,10 @@
                                             type="number" inputMode="numeric"
                                             placeholder={repsPlaceholder}
                                             value={set.reps || ''}
+                                            disabled={isCompleted}
                                             onChange={(e) => onUpdateSet(idx, 'reps', e.target.value)}
-                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-white'}`}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all disabled:opacity-60 ${isCompleted ? 'text-success' : 'text-white'}`}
+                                            style={isCompleted ? { WebkitTextFillColor: '#10b981' } : {}}
                                         />
                                     </div>
 
@@ -818,9 +831,10 @@
                                             type="number" inputMode="numeric"
                                             placeholder="RIR"
                                             value={set.actualRIR || ''}
+                                            disabled={isCompleted}
                                             onChange={(e) => onUpdateSet(idx, 'actualRIR', e.target.value)}
-                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all ${isCompleted ? 'text-success' : 'text-gray-400'}`}
-                                            style={{ fontSize: '0.9rem' }}
+                                            className={`w-full bg-dark/50 rounded-lg py-2.5 text-center text-lg font-bold outline-none focus:ring-2 focus:ring-primary/50 focus:bg-dark transition-all disabled:opacity-60 ${isCompleted ? 'text-success' : 'text-gray-400'}`}
+                                            style={isCompleted ? { fontSize: '0.9rem', WebkitTextFillColor: '#10b981' } : { fontSize: '0.9rem' }}
                                         />
                                     </div>
 
@@ -931,15 +945,15 @@
                 });
             };
 
-            const addSet = (exId, exSets) => {
+            const addSet = (exId, exSets, defaultRIR = '') => {
                 setData(prev => {
                     const newLogs = { ...prev.logs };
                     const currentSets = newLogs[exId]?.sets?.length
                         ? [...newLogs[exId].sets]
-                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, actualRIR: '', completed: false }));
+                        : Array.from({ length: exSets }, () => ({ weight: 0, reps: 0, actualRIR: defaultRIR, completed: false }));
 
-                    const last = currentSets[currentSets.length - 1] || { weight: 0, reps: 0, actualRIR: '' };
-                    currentSets.push({ weight: last.weight, reps: last.reps, actualRIR: '', completed: false });
+                    const last = currentSets[currentSets.length - 1] || { weight: 0, reps: 0, actualRIR: defaultRIR };
+                    currentSets.push({ weight: last.weight, reps: last.reps, actualRIR: defaultRIR, completed: false });
 
                     newLogs[exId] = { ...newLogs[exId], sets: currentSets };
                     return { ...prev, logs: newLogs };
@@ -1119,7 +1133,7 @@
 
             return (
                 <div className="min-h-screen pb-24 pb-safe font-sans bg-dark text-slate-200 selection:bg-primary selection:text-dark">
-                    <div className="glass-header sticky top-0 z-40 px-4 py-3 flex justify-between items-center">
+                    <div className="glass-header sticky top-0 z-40 px-4 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <div className="bg-primary text-dark p-1.5 rounded-lg shadow-glow">
                                 <Dumbbell size={20} />
@@ -1200,7 +1214,7 @@
                                         calculatedTM={autoTMs[ex.baseLift]}
                                         previousLogWeight={previousWeight}
                                         onUpdateSet={(idx, field, val) => updateSet(ex.id, ex.sets, idx, field, val, ex.name, ex.baseLift)}
-                                        onAddSet={() => addSet(ex.id, ex.sets)}
+                                        onAddSet={() => addSet(ex.id, ex.sets, getDefaultRIR(ex.rir))}
                                         onRemoveSet={() => removeSet(ex.id, ex.sets)}
                                         onEditExercise={setEditExercise}
                                     />
