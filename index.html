@@ -1045,23 +1045,34 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+                URL.revokeObjectURL(url);
             };
 
             const importData = (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
 
+                // Cache input to reset it later
+                const input = event.target;
+
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     try {
                         const json = JSON.parse(e.target.result);
                         if (!json.program || !json.settings) throw new Error("Invalid file structure");
+
+                        // Ensure critical data structures exist to prevent crashes
+                        if (!json.logs) json.logs = {};
+
                         setData(json);
                         alert("Данные успешно загружены!");
                         setSettingsOpen(false);
                     } catch (err) {
                         alert("Ошибка при чтении файла. Убедитесь, что это корректный JSON бэкап.");
                         console.error(err);
+                    } finally {
+                        // Allow re-uploading the same file
+                        input.value = '';
                     }
                 };
                 reader.readAsText(file);
