@@ -361,7 +361,7 @@
                 if (week === 1) return 3;
                 if (week === 2) return 3;
                 if (week === 3) return 4;
-                if (week === 4) return 2;
+                if (week === 4) return 3;
                 return 3;
             };
 
@@ -374,12 +374,12 @@
                     title: "Жим + Плечи + Руки",
                     exercises: [
                         { id: `w${week}_d1_bench`, name: 'Жим лежа', baseLift: BaseLift.Bench, sets: bench.sets, reps: bench.reps, rir: bench.rir, percentage: bench.percentage },
-                        { id: `w${week}_d1_dips`, name: 'Отжимания на брусьях', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '8-12', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_dips`, name: 'Отжимания на брусьях', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
                         { id: `w${week}_d1_lat`, name: 'Махи в стороны', baseLift: BaseLift.None, sets: isDeload ? 3 : 4, reps: '12-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
-                        { id: `w${week}_d1_tri`, name: 'Разгибания на трицепс', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d1_tri`, name: 'Разгибания на трицепс', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
                         { id: `w${week}_d1_ez`, name: 'Сгибания с EZ-грифом', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
-                        { id: `w${week}_d1_rev`, name: 'Обратные сгибания', baseLift: BaseLift.None, sets: isDeload ? 1 : 2, reps: '12-15', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d1_wrist`, name: 'Скручивания кистей', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '15-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
+                        { id: `w${week}_d1_rev`, name: 'Обратные сгибания', baseLift: BaseLift.None, sets: 3, reps: '12-15', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d1_wrist`, name: 'Скручивания кистей', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: isDeload ? '3' : '2-3', percentage: 0 },
                     ]
                 };
 
@@ -393,7 +393,7 @@
                     title: "Становая + Спина",
                     exercises: [
                         { id: `w${week}_d2_dl`, name: 'Становая тяга', baseLift: BaseLift.Deadlift, sets: getDeadliftSets(week), reps: dlReps, rir: dl.rir, percentage: dl.percentage },
-                        { id: `w${week}_d2_pull`, name: 'Подтягивания', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '4-10', rir: '2-3', percentage: 0 },
+                        { id: `w${week}_d2_pull`, name: 'Подтягивания', baseLift: BaseLift.None, sets: 3, reps: '4-10', rir: '2-3', percentage: 0 },
                         { id: `w${week}_d2_row`, name: 'Тяга в наклоне', baseLift: BaseLift.None, sets: 3, reps: '6-10', rir: '2', percentage: 0 },
                         { id: `w${week}_d2_rdl`, name: 'Румынская тяга', baseLift: BaseLift.None, sets: 3, reps: '8-12', rir: '2', percentage: 0 },
 
@@ -420,14 +420,14 @@
                     title: "Присед + Ноги",
                     exercises: [
                         { id: `w${week}_d4_sq`, name: 'Приседания', baseLift: BaseLift.Squat, sets: sq.sets, reps: sq.reps, rir: sq.rir, percentage: sq.percentage },
-                        { id: `w${week}_d4_lp`, name: 'Жим ногами', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_lp`, name: 'Жим ногами', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
                         { id: `w${week}_d4_alf`, name: 'Приседания Альфредсона', baseLift: BaseLift.None, sets: 3, reps: '12-15', rir: '2-3', percentage: 0 },
-                        { id: `w${week}_d4_lc`, name: 'Сгибания ног', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_tke`, name: 'Разгибания ног (резина)', baseLift: BaseLift.None, sets: 2, reps: '15-20', rir: '3', percentage: 0 },
-                        { id: `w${week}_d4_ws`, name: 'Стульчик', baseLift: BaseLift.None, sets: 2, reps: '30-60s', rir: '3', percentage: 0 },
-                        { id: `w${week}_d4_lr`, name: 'Легкая тяга', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '12-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_ham`, name: 'Молот', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
-                        { id: `w${week}_d4_rop`, name: 'Разгибания с канатом', baseLift: BaseLift.None, sets: isDeload ? 2 : 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_lc`, name: 'Сгибания ног', baseLift: BaseLift.None, sets: 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_tke`, name: 'Разгибания ног (резина)', baseLift: BaseLift.None, sets: 3, reps: '15-20', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_ws`, name: 'Стульчик', baseLift: BaseLift.None, sets: 3, reps: '30-60s', rir: '3', percentage: 0 },
+                        { id: `w${week}_d4_lr`, name: 'Легкая тяга', baseLift: BaseLift.None, sets: 3, reps: '12-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_ham`, name: 'Молот', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
+                        { id: `w${week}_d4_rop`, name: 'Разгибания с канатом', baseLift: BaseLift.None, sets: 3, reps: '10-15', rir: '2', percentage: 0 },
 
                     ]
                 };
